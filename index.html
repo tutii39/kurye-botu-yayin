@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Kurye Botu — Yönetim Paneli</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛵</text></svg>" />
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --text:#1f2328; --muted:#57606a; --line:#d0d7de; --green:#1f883d; --yellow:#bf8700; --red:#cf222e; --gray:#6e7781; --blue:#0969da; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", Roboto, Arial, sans-serif; padding: env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0); }
+  header { position: sticky; top: 0; z-index: 5; background: #24292f; color: #fff; padding: 12px 16px; display:flex; align-items:center; gap:10px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; }
+  header button { background: transparent; color: #fff; border: 1px solid #57606a; }
+  main { max-width: 900px; margin: 0 auto; padding: 12px; }
+  .card { background: var(--card); border:1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: #f6f8fa; cursor: pointer; }
+  button.primary { background: var(--green); color:#fff; border-color: var(--green); }
+  button.danger { background: var(--red); color:#fff; border-color: var(--red); }
+  button:disabled { opacity: .5; }
+  input { font: inherit; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin: 4px 0 10px; }
+  .row { display:flex; align-items:center; gap:10px; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; display:inline-block; }
+  .green { background: var(--green); } .yellow { background: var(--yellow); } .red { background: var(--red); } .gray { background: var(--gray); }
+  .name { font-weight: 700; font-size: 16px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eaeef2; color: var(--muted); white-space: nowrap; }
+  .badge.off { background: #ffebe9; color: var(--red); font-weight: 700; }
+  .badge.offline { background: #fff8c5; color: #7d4e00; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px 12px; margin: 10px 0; }
+  .grid div span { display:block; color: var(--muted); font-size: 12px; }
+  .actions { display:flex; flex-wrap: wrap; gap: 6px; }
+  .switch { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+  .switch input { display:none; }
+  .switch .track { width: 46px; height: 26px; border-radius: 13px; background: var(--red); position: relative; transition: .2s; }
+  .switch .track::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.2s; }
+  .switch input:checked + .track { background: var(--green); }
+  .switch input:checked + .track::after { left: 23px; }
+  .global { border-width: 2px; }
+  .hidden { display: none !important; }
+  .msg { padding: 8px 10px; border-radius: 8px; margin: 8px 0; font-size: 14px; }
+  .msg.err { background:#ffebe9; color:#a40e26; } .msg.ok { background:#dafbe1; color:#116329; }
+  dialog { width: min(900px, 96vw); max-height: 88vh; border: none; border-radius: 12px; padding: 0; }
+  dialog .head { display:flex; align-items:center; padding: 10px 14px; border-bottom: 1px solid var(--line); gap: 8px; }
+  dialog pre { margin:0; padding: 12px; max-height: 72vh; overflow:auto; background:#0d1117; color:#c9d1d9; font: 12px/1.45 Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .tabs { display:flex; gap:6px; margin: 0 0 10px; }
+  .tabs button.active { background:#24292f; color:#fff; border-color:#24292f; }
+  table.report { width:100%; border-collapse: collapse; font-size: 14px; }
+  table.report th, table.report td { text-align:left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.report td.num, table.report th.num { text-align:right; }
+  .scroll { overflow-x:auto; }
+  .small-switch { display:flex; align-items:center; gap:8px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .note { font-size: 13px; background:#fff8c5; padding: 4px 8px; border-radius: 6px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛵 Kurye Botu — Yönetim</h1>
+  <button id="btnLogout" class="hidden">Çıkış</button>
+</header>
+<main>
+  <!-- Giriş -->
+  <section id="loginBox" class="card">
+    <h2 style="margin-top:0">Giriş</h2>
+    <label>E-posta<input id="email" type="email" autocomplete="username" /></label>
+    <label>Şifre<input id="password" type="password" autocomplete="current-password" /></label>
+    <button id="btnLogin" class="primary">Giriş yap</button>
+    <div id="loginMsg" class="msg err hidden"></div>
+  </section>
+
+  <!-- Panel -->
+  <section id="app" class="hidden">
+    <div class="card global">
+      <div class="row">
+        <div class="grow">
+          <div class="name">Tüm işletmeler</div>
+          <div class="muted">Kapatınca bütün programlar sipariş iletmeyi durdurur. İşletmeler Trendyol / Yemeksepeti'den sipariş almaya normal devam eder.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="globalSwitch" /><span class="track"></span></label>
+      </div>
+    </div>
+    <div class="tabs">
+      <button id="tabInst" class="active">İşletmeler</button>
+      <button id="tabReport">Sipariş sayıları</button>
+    </div>
+    <section id="reportView" class="card hidden">
+      <div class="row">
+        <div class="grow"><b>Aylık sipariş sayıları</b><div class="muted">Programların bildirdiği teslimatlar. Müşteri bilgisi tutulmaz.</div></div>
+        <input id="month" type="month" style="width:auto;margin:0" />
+        <button id="btnCsv">Excel'e aktar (CSV)</button>
+      </div>
+      <div class="scroll" style="margin-top:10px"><table class="report" id="reportTable"></table></div>
+    </section>
+    <div id="instView">
+    <div class="row muted" style="margin: 0 4px 8px">
+      <div class="grow" id="summary">-</div>
+      <span id="lastRefresh"></span>
+      <button id="btnRefresh">Yenile</button>
+    </div>
+    <div id="list"></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="logDialog">
+  <div class="head"><b class="grow" id="logTitle">Kayıtlar</b><button id="btnCloseLog">Kapat</button></div>
+  <pre id="logContent"></pre>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
+<script>
+// ===================== AYARLAR (kurulumda doldurulur) =====================
+const SUPABASE_URL = 'https://usmrjaoxpplwtmmooszy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_-b1wfVJ6pCk8VP23k558jA_kSYO_gtg';
+// ==========================================================================
+
+const $ = (id) => document.getElementById(id);
+const ONLINE_MS = 3 * 60 * 1000;
+const db = (window.__MOCK_DB__) || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let data = { installations: [], commands: [], logs: [], globalEnabled: true };
+let timer = null;
+
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function ago(ts) {
+  if (!ts) return '-';
+  const t = typeof ts === 'number' ? ts : Date.parse(ts);
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `${s} sn önce`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} dk önce`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} saat önce`;
+  return new Date(t).toLocaleDateString('tr-TR');
+}
+const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
+
+// ------------------------------------------------------------------ giriş
+async function login() {
+  $('loginMsg').classList.add('hidden');
+  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+  if (error) return showLoginError('Giriş yapılamadı: ' + error.message);
+  await start();
+}
+function showLoginError(t) { $('loginMsg').textContent = t; $('loginMsg').classList.remove('hidden'); }
+
+async function start() {
+  const { data: s } = await db.auth.getSession();
+  if (!s || !s.session) return;
+  const ok = await load();
+  if (!ok) {
+    await db.auth.signOut();
+    return showLoginError('Bu hesabın yönetici yetkisi yok. Supabase\'de "admins" tablosuna e-postanızı ekleyin.');
+  }
+  $('loginBox').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('btnLogout').classList.remove('hidden');
+  clearInterval(timer);
+  timer = setInterval(load, 15000);
+}
+
+async function logout() {
+  clearInterval(timer);
+  await db.auth.signOut();
+  location.reload();
+}
+
+// ------------------------------------------------------------------ veri
+async function load() {
+  const [inst, g, cmds, logs] = await Promise.all([
+    db.from('installations').select('*').order('business_name', { ascending: true }),
+    db.from('settings').select('*').eq('key', 'global'),
+    db.from('commands').select('*').order('created_at', { ascending: false }).limit(300),
+    db.from('logs').select('id, installation_id, created_at').order('created_at', { ascending: false }).limit(300),
+  ]);
+  if (g.error || !g.data || g.data.length === 0) return false; // yönetici değil
+  data.installations = inst.data || [];
+  data.commands = cmds.data || [];
+  data.logs = logs.data || [];
+  data.globalEnabled = !(g.data[0].value && g.data[0].value.enabled === false);
+  render();
+  $('lastRefresh').textContent = 'güncellendi ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return true;
+}
+
+// ------------------------------------------------------------------ çizim
+function render() {
+  $('globalSwitch').checked = data.globalEnabled;
+  const list = $('list');
+  const now = Date.now();
+  let online = 0, problems = 0;
+  list.innerHTML = '';
+  if (data.installations.length === 0) {
+    list.innerHTML = '<div class="card muted">Henüz bağlanan program yok. Program kurulduğunda burada otomatik görünür.</div>';
+  }
+  for (const i of data.installations) {
+    const st = i.status || {};
+    const isOnline = i.last_seen && now - Date.parse(i.last_seen) < ONLINE_MS;
+    if (isOnline) online++;
+    const color = !isOnline ? 'gray' : (st.health && st.health.color) || 'gray';
+    if (color === 'red' || color === 'yellow' || !isOnline) problems++;
+    const lastCmd = data.commands.find((c) => c.installation_id === i.id);
+    const hasLog = data.logs.some((l) => l.installation_id === i.id);
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="row">
+        <span class="dot ${color}"></span>
+        <div class="grow">
+          <div class="name">${esc(i.business_name || 'İsimsiz kurulum')}</div>
+          <div class="muted">${esc(isOnline ? (st.health && st.health.label) || '-' : 'Çevrimdışı — son görülme ' + ago(i.last_seen))}</div>
+        </div>
+        ${i.enabled ? '' : '<span class="badge off">KAPALI</span>'}
+        ${!isOnline ? '<span class="badge offline">çevrimdışı</span>' : ''}
+        <label class="switch" title="Bu işletme için hizmet"><input type="checkbox" data-act="toggle" ${i.enabled ? 'checked' : ''} /><span class="track"></span></label>
+      </div>
+      <div class="grid">
+        <div><span>Son rapordan beri</span>${esc(st.today_count ?? '-')}</div>
+        <div><span>Son sipariş</span>${esc(st.last_order || '-')}${st.last_order_at ? ' · ' + ago(st.last_order_at) : ''}</div>
+        <div><span>Bekleyen</span>${esc(st.pending_count ?? 0)}</div>
+        <div><span>Kaynak</span>${esc(st.source_name || '-')}</div>
+        <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
+        <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
+      </div>
+      <label class="small-switch"><span class="switch"><input type="checkbox" data-act="update" ${i.update_allowed ? 'checked' : ''} /><span class="track"></span></span> Yeni sürümleri alsın ${i.update_allowed ? '(açık)' : '(kapalı)'}</label>
+      ${i.note ? `<div class="note">📝 ${esc(i.note)}</div>` : ''}
+      ${lastCmd ? `<div class="muted" style="margin:6px 0">Son komut: ${esc(CMD_LABEL[lastCmd.type] || lastCmd.type)} · ${lastCmd.done_at ? '✅ ' + esc(lastCmd.result || 'tamam') : lastCmd.delivered_at ? '⏳ iletildi' : '⏳ program bekleniyor'} · ${ago(lastCmd.created_at)}</div>` : ''}
+      <div class="actions">
+        <button data-act="cmd" data-type="restart">Yeniden başlat</button>
+        <button data-act="cmd" data-type="upload_logs">Kayıt iste</button>
+        <button data-act="logs" ${hasLog ? '' : 'disabled'}>Kayıtları gör</button>
+        <button data-act="cmd" data-type="update_now">Şimdi güncelle</button>
+        <button data-act="note">Not</button>
+        <button data-act="delete">Sil</button>
+      </div>`;
+    card.querySelectorAll('[data-act]').forEach((el) => {
+      const act = el.getAttribute('data-act');
+      if (act === 'toggle') el.onchange = () => toggleInstallation(i, el.checked, el);
+      else if (act === 'update') el.onchange = () => toggleUpdate(i, el.checked, el);
+      else el.onclick = () => action(i, act, el.getAttribute('data-type'));
+    });
+    list.appendChild(card);
+  }
+  $('summary').textContent = `${data.installations.length} işletme · ${online} çevrimiçi · ${problems} dikkat gerektiren`;
+}
+
+// ------------------------------------------------------------------ işlemler
+async function toggleInstallation(i, enabled, el) {
+  const msg = enabled
+    ? `${i.business_name} için hizmet AÇILSIN mı?`
+    : `${i.business_name} için hizmet KAPATILSIN mı?\n\nProgram siparişleri kurye grubuna iletmeyi 1 dakika içinde durdurur. İşletme platformlardan sipariş almaya devam eder.`;
+  if (!confirm(msg)) { el.checked = !enabled; return; }
+  const { error } = await db.from('installations').update({ enabled }).eq('id', i.id);
+  if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !enabled; }
+  load();
+}
+
+async function toggleUpdate(i, allowed, el) {
+  const msg = allowed
+    ? `${i.business_name} yeni sürümleri alsın mı?\n\nYayınlanmış yeni bir sürüm varsa program onu indirip gece 03:00-05:00 arasında kurar.`
+    : `${i.business_name} için güncellemeler durdurulsun mu?`;
+  if (!confirm(msg)) { el.checked = !allowed; return; }
+  const { error } = await db.from('installations').update({ update_allowed: allowed }).eq('id', i.id);
+  if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !allowed; }
+  load();
+}
+
+// ------------------------------------------------------------------ sipariş sayıları
+let reportRows = [];
+function monthRange(v) {
+  const [y, m] = v.split('-').map(Number);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const endDate = new Date(y, m, 0).getDate();
+  return { start, end: `${y}-${String(m).padStart(2, '0')}-${String(endDate).padStart(2, '0')}` };
+}
+async function loadReport() {
+  const { start, end } = monthRange($('month').value);
+  const { data: rows, error } = await db.from('orders_daily').select('*').gte('day', start).lte('day', end).order('day', { ascending: true });
+  if (error) { $('reportTable').innerHTML = `<tr><td>Yüklenemedi: ${esc(error.message)}</td></tr>`; return; }
+  reportRows = rows || [];
+  const names = Object.fromEntries(data.installations.map((i) => [i.id, i.business_name || 'İsimsiz']));
+  const platforms = new Set();
+  const byInst = {};
+  for (const r of reportRows) {
+    const b = (byInst[r.installation_id] = byInst[r.installation_id] || { total: 0, by: {}, days: 0 });
+    b.total += r.total;
+    if (r.total > 0) b.days += 1;
+    for (const [p, n] of Object.entries(r.by_platform || {})) { platforms.add(p); b.by[p] = (b.by[p] || 0) + n; }
+  }
+  const plats = [...platforms].sort();
+  const ids = Object.keys(byInst).sort((a, b) => (names[a] || '').localeCompare(names[b] || '', 'tr'));
+  if (!ids.length) { $('reportTable').innerHTML = '<tr><td class="muted">Bu ay için kayıt yok.</td></tr>'; return; }
+  let html = `<tr><th>İşletme</th><th class="num">Toplam</th>${plats.map((p) => `<th class="num">${esc(p)}</th>`).join('')}<th class="num">Sipariş olan gün</th></tr>`;
+  let grand = 0;
+  for (const id of ids) {
+    const b = byInst[id]; grand += b.total;
+    html += `<tr><td>${esc(names[id] || 'Silinmiş kurulum')}</td><td class="num"><b>${b.total}</b></td>${plats.map((p) => `<td class="num">${b.by[p] || 0}</td>`).join('')}<td class="num">${b.days}</td></tr>`;
+  }
+  html += `<tr><td><b>Toplam</b></td><td class="num"><b>${grand}</b></td>${plats.map(() => '<td></td>').join('')}<td></td></tr>`;
+  $('reportTable').innerHTML = html;
+}
+function downloadCsv() {
+  const names = Object.fromEntries(data.installations.map((i) => [i.id, i.business_name || 'İsimsiz']));
+  const plats = [...new Set(reportRows.flatMap((r) => Object.keys(r.by_platform || {})))].sort();
+  const lines = [['İşletme', 'Gün', 'Toplam', ...plats].join(';')];
+  for (const r of reportRows) lines.push([names[r.installation_id] || 'Silinmiş kurulum', r.day, r.total, ...plats.map((p) => (r.by_platform || {})[p] || 0)].join(';'));
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kurye-botu-siparisler-${$('month').value}.csv`;
+  a.click();
+}
+function showTab(which) {
+  $('tabInst').classList.toggle('active', which === 'inst');
+  $('tabReport').classList.toggle('active', which === 'report');
+  $('instView').classList.toggle('hidden', which !== 'inst');
+  $('reportView').classList.toggle('hidden', which !== 'report');
+  if (which === 'report') loadReport();
+}
+
+async function setGlobal(enabled) {
+  const msg = enabled
+    ? 'TÜM işletmeler için hizmet AÇILSIN mı?\n(Tek tek kapattıklarınız kapalı kalır.)'
+    : 'TÜM işletmeler için hizmet KAPATILSIN mı?\n\nBütün programlar 1 dakika içinde sipariş iletmeyi durdurur.';
+  if (!confirm(msg)) { $('globalSwitch').checked = !enabled; return; }
+  const { error } = await db.from('settings').update({ value: { enabled } }).eq('key', 'global');
+  if (error) { alert('Kaydedilemedi: ' + error.message); $('globalSwitch').checked = !enabled; }
+  load();
+}
+
+async function action(i, act, type) {
+  if (act === 'cmd') {
+    if (type === 'update_now' && !confirm(`${i.business_name}: yeni sürüm varsa şimdi kurulsun mu? Program kısa süreliğine kapanıp açılır.`)) return;
+    if (type === 'restart' && !confirm(`${i.business_name}: program yeniden başlatılsın mı?`)) return;
+    const { error } = await db.from('commands').insert({ installation_id: i.id, type });
+    if (error) alert('Komut gönderilemedi: ' + error.message);
+    return load();
+  }
+  if (act === 'logs') {
+    const { data: rows, error } = await db.from('logs').select('*').eq('installation_id', i.id).order('created_at', { ascending: false }).limit(1);
+    if (error || !rows || !rows.length) return alert('Kayıt bulunamadı.');
+    $('logTitle').textContent = `${i.business_name} — ${new Date(rows[0].created_at).toLocaleString('tr-TR')}`;
+    $('logContent').textContent = rows[0].content;
+    $('logDialog').showModal();
+    $('logContent').scrollTop = $('logContent').scrollHeight;
+    return;
+  }
+  if (act === 'note') {
+    const note = prompt(`${i.business_name} için not:`, i.note || '');
+    if (note === null) return;
+    await db.from('installations').update({ note: note.trim() || null }).eq('id', i.id);
+    return load();
+  }
+  if (act === 'delete') {
+    if (!confirm(`${i.business_name} listeden silinsin mi?\n\nProgram hâlâ kuruluysa bir dakika içinde yeniden görünür. Sadece kaldırılmış kurulumları silin.`)) return;
+    await db.from('installations').delete().eq('id', i.id);
+    return load();
+  }
+}
+
+// ------------------------------------------------------------------ başlangıç
+$('btnLogin').onclick = login;
+$('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+$('btnLogout').onclick = logout;
+$('btnRefresh').onclick = load;
+$('globalSwitch').onchange = () => setGlobal($('globalSwitch').checked);
+$('btnCloseLog').onclick = () => $('logDialog').close();
+$('tabInst').onclick = () => showTab('inst');
+$('tabReport').onclick = () => showTab('report');
+$('month').value = new Date().toISOString().slice(0, 7);
+$('month').onchange = loadReport;
+$('btnCsv').onclick = downloadCsv;
+start();
+</script>
+</body>
+</html>
