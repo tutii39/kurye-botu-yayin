@@ -55,6 +55,14 @@
   .features label { display:flex; align-items:center; gap:8px; font-size: 13px; cursor:pointer; }
   .features label.custom span.t::after { content: ' •'; color: var(--blue); }
   details.pkg summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .sform { display:grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-top: 8px; }
+  .sform label { font-size: 13px; display:block; }
+  .sform label.chk { display:flex; align-items:center; gap:8px; }
+  .sform input[type=checkbox] { width: 18px; height: 18px; margin: 0; flex: none; }
+  .sform input[type=text], .sform input[type=number], .sform input[type=time], .sform select, .sform textarea { width:100%; padding:7px; border:1px solid var(--line); border-radius:6px; font: inherit; font-size: 13px; margin: 3px 0 0; }
+  .sform .full { grid-column: 1 / -1; }
+  .sstate { font-size: 13px; margin: 6px 0; }
+  @media (max-width: 520px) { .sform { grid-template-columns: 1fr; } }
   .note { font-size: 13px; background:#fff8c5; padding: 4px 8px; border-radius: 6px; margin-top: 6px; }
 </style>
 </head>
@@ -184,7 +192,7 @@ async function logout() {
 }
 
 // ------------------------------------------------------------------ veri
-async function load() {
+async function load(force) {
   const [inst, g, cmds, logs] = await Promise.all([
     db.from('installations').select('*').order('business_name', { ascending: true }),
     db.from('settings').select('*'),
@@ -198,6 +206,10 @@ async function load() {
   data.commands = cmds.data || [];
   data.logs = logs.data || [];
   data.globalEnabled = !(settingsByKey.global && settingsByKey.global.enabled === false);
+  if (!force && document.querySelector('details.settings[open]')) {
+    $('lastRefresh').textContent = 'ayar formu açık, yenileme duraklatıldı';
+    return true;
+  }
   render();
   $('lastRefresh').textContent = 'güncellendi ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return true;
@@ -208,6 +220,58 @@ function featureToggles(effective, custom, prefix) {
   return FEATURES.map((f) => `<label class="${custom && custom[f.key] !== undefined ? 'custom' : ''}" title="${custom && custom[f.key] !== undefined ? 'Bu işletmeye özel ayar' : 'Varsayılan paketten'}">
       <span class="switch"><input type="checkbox" data-feature="${f.key}" data-scope="${prefix}" ${effective[f.key] !== false ? 'checked' : ''} /><span class="track"></span></span>
       <span class="t">${esc(f.label)}</span></label>`).join('');
+}
+
+// ------------------------------------------------------------------ panelden ayar
+const phonesToLines = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean).join('\n');
+const isTrue = (v) => v === true || String(v).toLowerCase() === 'true';
+
+function settingsBlock(i) {
+  const st = i.status || {};
+  const cur = st.settings;
+  if (!cur) return '<p class="muted">Bu programın sürümü ayarlarını bildirmiyor. Panelden ayar için 2.5.4 veya sonrası gerekir.</p>';
+  const ov = i.settings_override || {};
+  const pending = ov._rev && ov._rev !== st.settings_applied_rev;
+  const v = pending ? { ...cur, ...ov } : cur;
+  let state = '';
+  if (ov._rev) {
+    if (pending) state = '⏳ Gönderildi, program bekleniyor (1 dakika içinde uygulanır).';
+    else if (st.settings_result && st.settings_result.ok === false) state = '❌ Uygulanamadı, hiçbir ayar değişmedi: ' + esc((st.settings_result.errors || []).join('; '));
+    else state = '✅ Son gönderilen ayarlar uygulandı.';
+  }
+  const chk = (k, label) => `<label class="chk"><input type="checkbox" data-k="${k}" ${isTrue(v[k]) ? 'checked' : ''}/> ${label}</label>`;
+  const poll = String(Math.round((Number(v.POLL_INTERVAL_MS) || 15000) / 1000));
+  return `
+    ${state ? `<div class="sstate">${state}</div>` : ''}
+    <div class="sform">
+      ${chk('AUTO_ACCEPT_ENABLED', 'Otomatik kabul (Trendyol / Getir)')}
+      ${chk('AUTO_ACCEPT_DRY_RUN', 'Kuru deneme (gerçekte kabul etmez)')}
+      <label>Hazırlık süresi (dk)<input type="number" min="5" max="120" data-k="AUTO_ACCEPT_PREPARATION_MINUTES" value="${esc(v.AUTO_ACCEPT_PREPARATION_MINUTES || 20)}"/></label>
+      <label>Kontrol sıklığı<select data-k="POLL_INTERVAL_MS">${[15, 20, 30].map((n) => `<option value="${n}" ${String(n) === poll ? 'selected' : ''}>${n} saniye</option>`).join('')}</select></label>
+      ${chk('YEMEKSEPETI_EXTENSION', 'Yemeksepeti siparişlerini al')}
+      ${chk('ENABLE_COMPANY_GROUP_REPORT', 'Raporu kurye şirketi grubuna da gönder')}
+      <label>Gün sonu rapor saati<input type="time" data-k="REPORT_TIME" value="${esc(v.REPORT_TIME || '23:30')}"/></label>
+      <label>Harita uygulaması<select data-k="MAP_PROVIDER"><option value="google" ${v.MAP_PROVIDER !== 'yandex' ? 'selected' : ''}>Google Haritalar</option><option value="yandex" ${v.MAP_PROVIDER === 'yandex' ? 'selected' : ''}>Yandex Haritalar</option></select></label>
+      <label class="full">Rapor numaraları (her satıra bir)<textarea rows="2" data-k="REPORT_PHONE_NUMBERS">${esc(phonesToLines(v.REPORT_PHONE_NUMBERS))}</textarea></label>
+      ${chk('ALERTS_ENABLED', 'Sorun bildirimi açık')}
+      <span></span>
+      <label class="full">Bildirim numaraları (her satıra bir)<textarea rows="3" data-k="ALERT_NUMBERS">${esc(phonesToLines(v.ALERT_NUMBERS))}</textarea></label>
+      <label class="full">Restoran konumu (koordinat)<input type="text" data-k="RESTAURANT_LOCATION" value="${esc(v.RESTAURANT_LOCATION || '')}" placeholder="41.40123, 27.35678"/></label>
+      ${chk('PRINT_TRENDYOL', 'Program Trendyol/Getir fişi bassın')}
+      ${chk('PRINT_YEMEKSEPETI', 'Program Yemeksepeti fişi bassın')}
+    </div>
+    <div class="actions" style="margin-top:8px"><button class="primary" data-act="saveSettings">Kaydet ve gönder</button></div>`;
+}
+
+async function saveSettings(i, card) {
+  const vals = {};
+  card.querySelectorAll('[data-k]').forEach((el) => {
+    vals[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  if (!confirm(`${i.business_name} için ayarlar gönderilsin mi?\n\nProgram ayarları 1 dakika içinde uygular ve kendini birkaç saniyeliğine yeniden başlatır. Hatalı bir değer varsa hiçbir ayar değişmez.`)) return;
+  const { error } = await db.from('installations').update({ settings_override: { _rev: Date.now(), ...vals } }).eq('id', i.id);
+  if (error) return alert('Gönderilemedi: ' + error.message);
+  load(true);
 }
 
 function renderDefaults() {
@@ -255,6 +319,9 @@ function render() {
         <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
       </div>
+      <details class="pkg settings"><summary>Ayarlar${(i.settings_override || {})._rev && (i.settings_override || {})._rev !== (i.status || {}).settings_applied_rev ? ' (⏳ gönderim bekliyor)' : ''}</summary>
+        ${settingsBlock(i)}
+      </details>
       <details class="pkg"><summary>Paket özellikleri${Object.keys(i.features || {}).length ? ' (işletmeye özel ayar var •)' : ''}</summary>
         <div class="features">${featureToggles({ ...(data.featureDefaults || {}), ...(i.features || {}) }, i.features || {}, 'inst')}</div>
         ${Object.keys(i.features || {}).length ? '<p class="muted" style="margin:6px 0 0"><a href="#" data-act="resetFeatures">Varsayılan pakete döndür</a></p>' : ''}
@@ -275,6 +342,7 @@ function render() {
       const act = el.getAttribute('data-act');
       if (act === 'toggle') el.onchange = () => toggleInstallation(i, el.checked, el);
       else if (act === 'update') el.onchange = () => toggleUpdate(i, el.checked, el);
+      else if (act === 'saveSettings') el.onclick = () => saveSettings(i, card);
       else el.onclick = () => action(i, act, el.getAttribute('data-type'));
     });
     list.appendChild(card);
@@ -424,7 +492,7 @@ async function action(i, act, type) {
 $('btnLogin').onclick = login;
 $('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
 $('btnLogout').onclick = logout;
-$('btnRefresh').onclick = load;
+$('btnRefresh').onclick = () => load(true);
 $('globalSwitch').onchange = () => setGlobal($('globalSwitch').checked);
 $('btnCloseLog').onclick = () => $('logDialog').close();
 $('tabInst').onclick = () => showTab('inst');
