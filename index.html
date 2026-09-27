@@ -51,6 +51,10 @@
   table.report td.num, table.report th.num { text-align:right; }
   .scroll { overflow-x:auto; }
   .small-switch { display:flex; align-items:center; gap:8px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .features { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 4px 14px; margin-top: 8px; }
+  .features label { display:flex; align-items:center; gap:8px; font-size: 13px; cursor:pointer; }
+  .features label.custom span.t::after { content: ' •'; color: var(--blue); }
+  details.pkg summary { cursor: pointer; font-size: 13px; color: var(--muted); margin-top: 8px; }
   .note { font-size: 13px; background:#fff8c5; padding: 4px 8px; border-radius: 6px; margin-top: 6px; }
 </style>
 </head>
@@ -93,6 +97,12 @@
       <div class="scroll" style="margin-top:10px"><table class="report" id="reportTable"></table></div>
     </section>
     <div id="instView">
+    <div class="card">
+      <details class="pkg" id="defaultsBox">
+        <summary><b>Yeni kurulumların varsayılan paketi</b> — işletmeye özel ayar yapılmamış özellikler buna uyar</summary>
+        <div class="features" id="defaultFeatures"></div>
+      </details>
+    </div>
     <div class="row muted" style="margin: 0 4px 8px">
       <div class="grow" id="summary">-</div>
       <span id="lastRefresh"></span>
@@ -133,6 +143,14 @@ function ago(ts) {
   if (h < 48) return `${h} saat önce`;
   return new Date(t).toLocaleDateString('tr-TR');
 }
+const FEATURES = [
+  { key: 'auto_accept', label: 'Otomatik kabul (Trendyol / Getir)' },
+  { key: 'yemeksepeti', label: 'Yemeksepeti bağlantısı' },
+  { key: 'print', label: 'Program fişi yazdırma' },
+  { key: 'maps', label: 'Harita / yol tarifi linki' },
+  { key: 'distance', label: 'Mesafe bilgisi' },
+  { key: 'alerts', label: 'Sorun bildirimi (WhatsApp)' },
+];
 const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
 
 // ------------------------------------------------------------------ giriş
@@ -169,22 +187,37 @@ async function logout() {
 async function load() {
   const [inst, g, cmds, logs] = await Promise.all([
     db.from('installations').select('*').order('business_name', { ascending: true }),
-    db.from('settings').select('*').eq('key', 'global'),
+    db.from('settings').select('*'),
     db.from('commands').select('*').order('created_at', { ascending: false }).limit(300),
     db.from('logs').select('id, installation_id, created_at').order('created_at', { ascending: false }).limit(300),
   ]);
   if (g.error || !g.data || g.data.length === 0) return false; // yönetici değil
+  const settingsByKey = Object.fromEntries(g.data.map((r) => [r.key, r.value]));
+  data.featureDefaults = settingsByKey.feature_defaults || {};
   data.installations = inst.data || [];
   data.commands = cmds.data || [];
   data.logs = logs.data || [];
-  data.globalEnabled = !(g.data[0].value && g.data[0].value.enabled === false);
+  data.globalEnabled = !(settingsByKey.global && settingsByKey.global.enabled === false);
   render();
   $('lastRefresh').textContent = 'güncellendi ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   return true;
 }
 
 // ------------------------------------------------------------------ çizim
+function featureToggles(effective, custom, prefix) {
+  return FEATURES.map((f) => `<label class="${custom && custom[f.key] !== undefined ? 'custom' : ''}" title="${custom && custom[f.key] !== undefined ? 'Bu işletmeye özel ayar' : 'Varsayılan paketten'}">
+      <span class="switch"><input type="checkbox" data-feature="${f.key}" data-scope="${prefix}" ${effective[f.key] !== false ? 'checked' : ''} /><span class="track"></span></span>
+      <span class="t">${esc(f.label)}</span></label>`).join('');
+}
+
+function renderDefaults() {
+  const box = $('defaultFeatures');
+  box.innerHTML = featureToggles(data.featureDefaults || {}, null, 'defaults');
+  box.querySelectorAll('input[data-feature]').forEach((el) => (el.onchange = () => setDefaultFeature(el.dataset.feature, el.checked, el)));
+}
+
 function render() {
+  renderDefaults();
   $('globalSwitch').checked = data.globalEnabled;
   const list = $('list');
   const now = Date.now();
@@ -222,6 +255,10 @@ function render() {
         <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
       </div>
+      <details class="pkg"><summary>Paket özellikleri${Object.keys(i.features || {}).length ? ' (işletmeye özel ayar var •)' : ''}</summary>
+        <div class="features">${featureToggles({ ...(data.featureDefaults || {}), ...(i.features || {}) }, i.features || {}, 'inst')}</div>
+        ${Object.keys(i.features || {}).length ? '<p class="muted" style="margin:6px 0 0"><a href="#" data-act="resetFeatures">Varsayılan pakete döndür</a></p>' : ''}
+      </details>
       <label class="small-switch"><span class="switch"><input type="checkbox" data-act="update" ${i.update_allowed ? 'checked' : ''} /><span class="track"></span></span> Yeni sürümleri alsın ${i.update_allowed ? '(açık)' : '(kapalı)'}</label>
       ${i.note ? `<div class="note">📝 ${esc(i.note)}</div>` : ''}
       ${lastCmd ? `<div class="muted" style="margin:6px 0">Son komut: ${esc(CMD_LABEL[lastCmd.type] || lastCmd.type)} · ${lastCmd.done_at ? '✅ ' + esc(lastCmd.result || 'tamam') : lastCmd.delivered_at ? '⏳ iletildi' : '⏳ program bekleniyor'} · ${ago(lastCmd.created_at)}</div>` : ''}
@@ -233,6 +270,7 @@ function render() {
         <button data-act="note">Not</button>
         <button data-act="delete">Sil</button>
       </div>`;
+    card.querySelectorAll('input[data-feature]').forEach((el) => (el.onchange = () => setInstFeature(i, el.dataset.feature, el.checked, el)));
     card.querySelectorAll('[data-act]').forEach((el) => {
       const act = el.getAttribute('data-act');
       if (act === 'toggle') el.onchange = () => toggleInstallation(i, el.checked, el);
@@ -252,6 +290,24 @@ async function toggleInstallation(i, enabled, el) {
   if (!confirm(msg)) { el.checked = !enabled; return; }
   const { error } = await db.from('installations').update({ enabled }).eq('id', i.id);
   if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !enabled; }
+  load();
+}
+
+async function setInstFeature(i, key, on, el) {
+  const label = (FEATURES.find((f) => f.key === key) || {}).label || key;
+  if (!confirm(`${i.business_name}: "${label}" ${on ? 'AÇILSIN' : 'KAPATILSIN'} mı?\n\nProgram 1 dakika içinde yeni paketle kendini yeniden başlatır.`)) { el.checked = !on; return; }
+  const features = { ...(i.features || {}), [key]: on };
+  const { error } = await db.from('installations').update({ features }).eq('id', i.id);
+  if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !on; }
+  load();
+}
+
+async function setDefaultFeature(key, on, el) {
+  const label = (FEATURES.find((f) => f.key === key) || {}).label || key;
+  if (!confirm(`Varsayılan pakette "${label}" ${on ? 'AÇILSIN' : 'KAPATILSIN'} mı?\n\nBu özellik için işletmeye özel ayar yapılmamış TÜM işletmeler etkilenir.`)) { el.checked = !on; return; }
+  const next = { ...(data.featureDefaults || {}), [key]: on };
+  const { error } = await db.from('settings').update({ value: next }).eq('key', 'feature_defaults');
+  if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !on; }
   load();
 }
 
@@ -282,28 +338,29 @@ async function loadReport() {
   const platforms = new Set();
   const byInst = {};
   for (const r of reportRows) {
-    const b = (byInst[r.installation_id] = byInst[r.installation_id] || { total: 0, by: {}, days: 0 });
+    const b = (byInst[r.installation_id] = byInst[r.installation_id] || { total: 0, by: {}, days: 0, km: 0 });
     b.total += r.total;
+    b.km += Number(r.km_total || 0);
     if (r.total > 0) b.days += 1;
     for (const [p, n] of Object.entries(r.by_platform || {})) { platforms.add(p); b.by[p] = (b.by[p] || 0) + n; }
   }
   const plats = [...platforms].sort();
   const ids = Object.keys(byInst).sort((a, b) => (names[a] || '').localeCompare(names[b] || '', 'tr'));
   if (!ids.length) { $('reportTable').innerHTML = '<tr><td class="muted">Bu ay için kayıt yok.</td></tr>'; return; }
-  let html = `<tr><th>İşletme</th><th class="num">Toplam</th>${plats.map((p) => `<th class="num">${esc(p)}</th>`).join('')}<th class="num">Sipariş olan gün</th></tr>`;
+  let html = `<tr><th>İşletme</th><th class="num">Toplam</th>${plats.map((p) => `<th class="num">${esc(p)}</th>`).join('')}<th class="num">Km (kuş uçuşu)</th><th class="num">Sipariş olan gün</th></tr>`;
   let grand = 0;
   for (const id of ids) {
     const b = byInst[id]; grand += b.total;
-    html += `<tr><td>${esc(names[id] || 'Silinmiş kurulum')}</td><td class="num"><b>${b.total}</b></td>${plats.map((p) => `<td class="num">${b.by[p] || 0}</td>`).join('')}<td class="num">${b.days}</td></tr>`;
+    html += `<tr><td>${esc(names[id] || 'Silinmiş kurulum')}</td><td class="num"><b>${b.total}</b></td>${plats.map((p) => `<td class="num">${b.by[p] || 0}</td>`).join('')}<td class="num">${b.km ? b.km.toLocaleString('tr-TR', { maximumFractionDigits: 1 }) : '-'}</td><td class="num">${b.days}</td></tr>`;
   }
-  html += `<tr><td><b>Toplam</b></td><td class="num"><b>${grand}</b></td>${plats.map(() => '<td></td>').join('')}<td></td></tr>`;
+  html += `<tr><td><b>Toplam</b></td><td class="num"><b>${grand}</b></td>${plats.map(() => '<td></td>').join('')}<td></td><td></td></tr>`;
   $('reportTable').innerHTML = html;
 }
 function downloadCsv() {
   const names = Object.fromEntries(data.installations.map((i) => [i.id, i.business_name || 'İsimsiz']));
   const plats = [...new Set(reportRows.flatMap((r) => Object.keys(r.by_platform || {})))].sort();
-  const lines = [['İşletme', 'Gün', 'Toplam', ...plats].join(';')];
-  for (const r of reportRows) lines.push([names[r.installation_id] || 'Silinmiş kurulum', r.day, r.total, ...plats.map((p) => (r.by_platform || {})[p] || 0)].join(';'));
+  const lines = [['İşletme', 'Gün', 'Toplam', ...plats, 'Km (kuş uçuşu)'].join(';')];
+  for (const r of reportRows) lines.push([names[r.installation_id] || 'Silinmiş kurulum', r.day, r.total, ...plats.map((p) => (r.by_platform || {})[p] || 0), String(r.km_total || 0).replace('.', ',')].join(';'));
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -344,6 +401,11 @@ async function action(i, act, type) {
     $('logDialog').showModal();
     $('logContent').scrollTop = $('logContent').scrollHeight;
     return;
+  }
+  if (act === 'resetFeatures') {
+    if (!confirm(`${i.business_name}: işletmeye özel paket ayarları silinsin, varsayılan pakete dönülsün mü?`)) return;
+    await db.from('installations').update({ features: {} }).eq('id', i.id);
+    return load();
   }
   if (act === 'note') {
     const note = prompt(`${i.business_name} için not:`, i.note || '');
