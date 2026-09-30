@@ -63,6 +63,8 @@
   .sform .full { grid-column: 1 / -1; }
   .sstate { font-size: 13px; margin: 6px 0; }
   @media (max-width: 520px) { .sform { grid-template-columns: 1fr; } }
+  .courier { font-size: 13px; background: #f6f8fa; padding: 6px 8px; border-radius: 6px; margin-top: 6px; }
+  .courier .warnline { color: #9a6700; font-weight: 600; }
   .note { font-size: 13px; background:#fff8c5; padding: 4px 8px; border-radius: 6px; margin-top: 6px; }
 </style>
 </head>
@@ -159,6 +161,8 @@ const FEATURES = [
   { key: 'distance', label: 'Mesafe bilgisi' },
   { key: 'alerts', label: 'Sorun bildirimi (WhatsApp)' },
   { key: 'phone_orders', label: 'Telefon siparişi girişi' },
+  { key: 'courier_tracking', label: 'Kurye takibi (alma, hatırlatma, kurye bazlı rapor)', defaultOff: true },
+  { key: 'courier_tracking_live', label: 'Kurye takibi: gerçek mod (kapalıysa sessiz)', defaultOff: true },
 ];
 const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
 
@@ -217,10 +221,28 @@ async function load(force) {
 }
 
 // ------------------------------------------------------------------ çizim
+// Varsayılanı kapalı özellikler (defaultOff) sadece açıkça açıldıysa açıktır; programdaki isOn ile aynı
+const featureOn = (effective, f) => (f.defaultOff ? effective[f.key] === true : effective[f.key] !== false);
+
 function featureToggles(effective, custom, prefix) {
   return FEATURES.map((f) => `<label class="${custom && custom[f.key] !== undefined ? 'custom' : ''}" title="${custom && custom[f.key] !== undefined ? 'Bu işletmeye özel ayar' : 'Varsayılan paketten'}">
-      <span class="switch"><input type="checkbox" data-feature="${f.key}" data-scope="${prefix}" ${effective[f.key] !== false ? 'checked' : ''} /><span class="track"></span></span>
+      <span class="switch"><input type="checkbox" data-feature="${f.key}" data-scope="${prefix}" ${featureOn(effective, f) ? 'checked' : ''} /><span class="track"></span></span>
       <span class="t">${esc(f.label)}</span></label>`).join('');
+}
+
+// ------------------------------------------------------------------ kurye takibi (2.6)
+const COURIER_WARN_ICON = { alma5: '⏰', alma10: '⚠️', teslim30: '📦' };
+const hhmm = (ts) => new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+function courierBlock(c) {
+  if (!c) return '';
+  const warns = (c.warnings || [])
+    .map((w) => `<div class="${w.silent ? 'muted' : 'warnline'}">${hhmm(w.at)} ${COURIER_WARN_ICON[w.kind] || '•'} ${esc(w.text)}${w.silent ? ' <i>(sessiz)</i>' : ''}</div>`)
+    .join('');
+  return `<div class="courier">
+      <div><b>Kurye takibi</b> · ${c.live ? 'gerçek mod' : 'sessiz mod'} · bugün ${esc(c.orders)} sipariş, ${esc(c.taken)} alındı, ${esc(c.delivered)} teslim${c.untaken ? `, <b>${esc(c.untaken)} bekliyor</b>` : ''}</div>
+      ${warns || '<div class="muted">Bugün uyarı yok.</div>'}
+    </div>`;
 }
 
 // ------------------------------------------------------------------ panelden ayar
@@ -320,6 +342,7 @@ function render() {
         <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
       </div>
+      ${courierBlock(st.courier)}
       <details class="pkg settings"><summary>Ayarlar${(i.settings_override || {})._rev && (i.settings_override || {})._rev !== (i.status || {}).settings_applied_rev ? ' (⏳ gönderim bekliyor)' : ''}</summary>
         ${settingsBlock(i)}
       </details>
