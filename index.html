@@ -66,6 +66,14 @@
   .courier { font-size: 13px; background: #f6f8fa; padding: 6px 8px; border-radius: 6px; margin-top: 6px; }
   .courier .warnline { color: #9a6700; font-weight: 600; }
   .note { font-size: 13px; background:#fff8c5; padding: 4px 8px; border-radius: 6px; margin-top: 6px; }
+  .jt-alert { background:#ffebe9; color:#a40e26; border:1px solid #ff8182; border-radius:8px; padding:8px 10px; margin:6px 0; font-size:14px; }
+  .jt-alert b { color:#82071e; }
+  .jt-warn { background:#fff8c5; color:#7d4e00; border-radius:8px; padding:6px 10px; margin:6px 0; font-size:13px; }
+  table.jt { width:100%; border-collapse: collapse; font-size: 13px; }
+  table.jt th, table.jt td { text-align:left; padding: 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.jt select { width:100%; padding:5px; border:1px solid var(--line); border-radius:6px; font: inherit; margin:0; }
+  .env { font-size: 11px; padding: 1px 6px; border-radius: 999px; background:#ddf4ff; color:#0969da; }
+  .env.live { background:#dafbe1; color:#116329; }
 </style>
 </head>
 <body>
@@ -113,6 +121,7 @@
         <div class="features" id="defaultFeatures"></div>
       </details>
     </div>
+    <div id="jtBox"></div>
     <div class="row muted" style="margin: 0 4px 8px">
       <div class="grow" id="summary">-</div>
       <span id="lastRefresh"></span>
@@ -163,6 +172,7 @@ const FEATURES = [
   { key: 'phone_orders', label: 'Telefon siparişi girişi' },
   { key: 'courier_tracking', label: 'Kurye takibi (alma, hatırlatma, kurye bazlı rapor)', defaultOff: true },
   { key: 'courier_tracking_live', label: 'Kurye takibi: gerçek mod (kapalıysa sessiz)', defaultOff: true },
+  { key: 'jettakip', label: 'JetTakip entegrasyonu (API siparişleri)', defaultOff: true },
 ];
 const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
 
@@ -198,12 +208,15 @@ async function logout() {
 
 // ------------------------------------------------------------------ veri
 async function load(force) {
-  const [inst, g, cmds, logs] = await Promise.all([
+  const [inst, g, cmds, logs, jt] = await Promise.all([
     db.from('installations').select('*').order('business_name', { ascending: true }),
     db.from('settings').select('*'),
     db.from('commands').select('*').order('created_at', { ascending: false }).limit(300),
     db.from('logs').select('id, installation_id, created_at').order('created_at', { ascending: false }).limit(300),
+    db.rpc('jettakip_admin_overview'),
   ]);
+  // JetTakip SQL'i (2.7) çalıştırılmamışsa bölüm gizli kalır
+  data.jt = jt && !jt.error && jt.data ? jt.data : null;
   if (g.error || !g.data || g.data.length === 0) return false; // yönetici değil
   const settingsByKey = Object.fromEntries(g.data.map((r) => [r.key, r.value]));
   data.featureDefaults = settingsByKey.feature_defaults || {};
@@ -211,7 +224,7 @@ async function load(force) {
   data.commands = cmds.data || [];
   data.logs = logs.data || [];
   data.globalEnabled = !(settingsByKey.global && settingsByKey.global.enabled === false);
-  if (!force && document.querySelector('details.settings[open]')) {
+  if (!force && (document.querySelector('details.settings[open]') || data.jtDirty)) {
     $('lastRefresh').textContent = 'ayar formu açık, yenileme duraklatıldı';
     return true;
   }
@@ -231,17 +244,143 @@ function featureToggles(effective, custom, prefix) {
 }
 
 // ------------------------------------------------------------------ kurye takibi (2.6)
-const COURIER_WARN_ICON = { alma5: '⏰', alma10: '⚠️', teslim30: '📦' };
+const COURIER_WARN_ICON = { alma5: '⏰', alma10: '⚠️' };
 const hhmm = (ts) => new Date(ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 
 function courierBlock(c) {
   if (!c) return '';
   const warns = (c.warnings || [])
+    .filter((w) => w.kind !== 'teslim30') // 2.6.0 programlarının sessiz teslim uyarıları
     .map((w) => `<div class="${w.silent ? 'muted' : 'warnline'}">${hhmm(w.at)} ${COURIER_WARN_ICON[w.kind] || '•'} ${esc(w.text)}${w.silent ? ' <i>(sessiz)</i>' : ''}</div>`)
+    .join('');
+  const und = (c.undelivered || [])
+    .map((u) => `<div>${hhmm(u.at)} · ${esc(u.no || 'Sipariş')}${u.platform ? ` (${esc(u.platform)})` : ''} · ${esc(u.courier)} · ${esc(u.minutes)} dk</div>`)
     .join('');
   return `<div class="courier">
       <div><b>Kurye takibi</b> · ${c.live ? 'gerçek mod' : 'sessiz mod'} · bugün ${esc(c.orders)} sipariş, ${esc(c.taken)} alındı, ${esc(c.delivered)} teslim${c.untaken ? `, <b>${esc(c.untaken)} bekliyor</b>` : ''}</div>
       ${warns || '<div class="muted">Bugün uyarı yok.</div>'}
+      ${und ? `<div class="warnline">📦 Teslimi bildirilmedi (${esc(c.undelivered.length)})</div>${und}` : ''}
+    </div>`;
+}
+
+// ------------------------------------------------------------------ JetTakip (2.7)
+const minsAgo = (t) => Math.max(0, Math.round((Date.now() - Date.parse(t)) / 60000));
+const instName = (id) => {
+  const i = data.installations.find((x) => x.id === id);
+  return i ? i.business_name || 'İsimsiz kurulum' : 'Silinmiş kurulum';
+};
+const instOnline = (i) => Boolean(i && i.last_seen && Date.now() - Date.parse(i.last_seen) < ONLINE_MS);
+
+/** 3 dakikadır gruba iletilmemiş siparişin sebebi */
+function stuckReason(o) {
+  if (!o.installation_id) return 'işletme bir kuruluma bağlı değil';
+  if (!o.has_group) return 'işletmenin WhatsApp grubu seçilmemiş';
+  const i = data.installations.find((x) => x.id === o.installation_id);
+  if (!i) return 'bağlı kurulum silinmiş';
+  if (!instOnline(i)) return `${instName(i.id)} çevrimdışı (son görülme ${ago(i.last_seen)})`;
+  const f = { ...(data.featureDefaults || {}), ...(i.features || {}) };
+  if (f.jettakip !== true) return `${instName(i.id)} kurulumunda "JetTakip entegrasyonu" kapalı`;
+  if (!i.enabled || !data.globalEnabled) return 'hizmet askıda';
+  return `${instName(i.id)} gruba gönderemiyor (programın kayıtlarına bakın)`;
+}
+
+/**
+ * Çift sipariş riski: işletmenin JetTakip grubu, Trendyol/Getir ya da Yemeksepeti siparişlerini de
+ * gönderen bir kurulumun kurye grubuysa aynı sipariş iki kez düşebilir.
+ */
+function doubleOrderWarnings() {
+  const out = [];
+  for (const r of (data.jt && data.jt.restaurants) || []) {
+    if (!r.wa_group_id || !r.active) continue;
+    for (const i of data.installations) {
+      const st = i.status || {};
+      if (st.central || st.courier_group_id !== r.wa_group_id) continue;
+      const platform = st.ys_enabled || /trendyol|getir|adisyo/i.test(st.source_name || '');
+      if (platform) out.push({ r, i, text: `<b>${esc(r.name)}</b>: siparişler hem JetTakip'ten hem <b>${esc(instName(i.id))}</b> kurulumunun ${esc(st.source_name || 'platform')} bağlantısından aynı gruba düşebilir (çift sipariş riski). İşletme JetTakip'e geçtiyse o kurulumda platform bağlantısını kapatın.` });
+    }
+  }
+  return out;
+}
+
+function groupOptions(i, selectedId) {
+  const st = (i && i.status) || {};
+  const groups = (st.jettakip && st.jettakip.groups) || [];
+  const own = st.courier_group_id;
+  const opts = groups.map((g) => `<option value="${esc(g.id)}" data-name="${esc(g.name)}" ${g.id === selectedId ? 'selected' : ''}>${esc(g.name)}${g.id === own ? ' (bu kurulumun kurye grubu)' : ''}</option>`);
+  if (selectedId && !groups.some((g) => g.id === selectedId)) opts.unshift(`<option value="${esc(selectedId)}" selected>(şu an seçili grup listede yok)</option>`);
+  return `<option value="">— grup seçin —</option>${opts.join('')}`;
+}
+
+function renderJetTakip() {
+  const box = $('jtBox');
+  if (!data.jt) { box.innerHTML = ''; return 0; }
+  const rests = data.jt.restaurants || [];
+  const stuck = data.jt.stuck || [];
+  const alerts = stuck.map((o) => `<div class="jt-alert">🔴 <b>${esc(o.restaurant)}</b> · sipariş ${esc(o.remote_id)}${o.environment === 'test' ? ' (test)' : ''} · <b>${minsAgo(o.received_at)} dakikadır</b> kurye grubuna iletilmedi — ${esc(stuckReason(o))}</div>`).join('');
+  const doubles = doubleOrderWarnings().map((w) => `<div class="jt-alert">⚠️ ${w.text}</div>`).join('');
+  const rows = rests.map((r) => {
+    const inst = data.installations.find((x) => x.id === r.installation_id);
+    const instOpts = `<option value="">— bağlı değil —</option>` + data.installations
+      .map((i) => `<option value="${i.id}" ${i.id === r.installation_id ? 'selected' : ''}>${esc(i.business_name || 'İsimsiz')}${(i.status || {}).central ? ' (merkez)' : ''}</option>`).join('');
+    const reported = inst && (inst.status || {}).jettakip;
+    const gHint = !inst ? '' : !reported ? '<div class="muted">Bu kurulumda JetTakip kapalı ya da grup listesi henüz gelmedi.</div>' : '';
+    return `<tr data-link="${r.id}">
+      <td><b>${esc(r.name)}</b><div class="muted">${esc(r.integrator)} · <span class="env ${r.environment === 'live' ? 'live' : ''}">${r.environment === 'live' ? 'canlı' : 'test'}</span> · ${esc(r.token_prefix || '')}…</div></td>
+      <td><select data-jt="inst">${instOpts}</select></td>
+      <td><select data-jt="group" ${inst ? '' : 'disabled'}>${inst ? groupOptions(inst, r.wa_group_id) : '<option>önce kurulum seçin</option>'}</select>${gHint}</td>
+      <td><button data-jt="save">Kaydet</button></td>
+    </tr>`;
+  }).join('');
+  box.innerHTML = `
+    ${alerts}${doubles}
+    <div class="card">
+      <details class="pkg" ${rests.some((r) => !r.installation_id || !r.wa_group_id) ? 'open' : ''}>
+        <summary><b>JetTakip işletmeleri</b> — ${rests.length} işletme · ${rests.filter((r) => r.installation_id && r.wa_group_id).length} eşlenmiş${stuck.length ? ` · <span style="color:var(--red)">${stuck.length} iletilmeyen sipariş</span>` : ''}</summary>
+        <p class="muted" style="margin:6px 0">Her işletmenin siparişi seçilen kurulumun WhatsApp numarasıyla seçilen gruba gider. Kurulumda "JetTakip entegrasyonu" açık olmalı; grup listesi kurulumdan gelir (en geç 5 dk).</p>
+        ${rests.length ? `<div class="scroll"><table class="jt"><tr><th>İşletme</th><th>Kurulum</th><th>WhatsApp grubu</th><th></th></tr>${rows}</table></div>` : '<p class="muted">Henüz JetTakip işletmesi yok.</p>'}
+      </details>
+    </div>`;
+  box.querySelectorAll('tr[data-link]').forEach((tr) => {
+    const r = rests.find((x) => x.id === tr.dataset.link);
+    const instSel = tr.querySelector('[data-jt=inst]');
+    const groupSel = tr.querySelector('[data-jt=group]');
+    groupSel.onchange = () => (data.jtDirty = true);
+    instSel.onchange = () => {
+      data.jtDirty = true;
+      const i = data.installations.find((x) => x.id === instSel.value);
+      groupSel.disabled = !i;
+      groupSel.innerHTML = i ? groupOptions(i, (i.status || {}).courier_group_id || null) : '<option>önce kurulum seçin</option>';
+    };
+    tr.querySelector('[data-jt=save]').onclick = () => saveJetTakipLink(r, instSel.value || null, groupSel.disabled ? null : groupSel.value || null, groupSel.selectedOptions[0] ? groupSel.selectedOptions[0].dataset.name || null : null);
+  });
+  return stuck.length + doubleOrderWarnings().length;
+}
+
+async function saveJetTakipLink(r, instId, groupId, groupName) {
+  if (instId && !groupId) return alert('Bir WhatsApp grubu seçin.');
+  const msg = instId
+    ? `${r.name} siparişleri "${instName(instId)}" kurulumundan "${groupName || 'seçili grup'}" grubuna gönderilsin mi?${r.environment === 'test' ? '\n\nTest işletmesi bir kuruluma bağlanınca otomatik oynatma durur, siparişler gerçekten gruba düşer.' : ''}`
+    : `${r.name} kurulumdan ayrılsın mı? Siparişleri hiçbir gruba gitmez (panelde kırmızı uyarı olur).`;
+  if (!confirm(msg)) return;
+  const { error } = await db.rpc('jettakip_admin_link', { p_link: r.id, p_installation: instId, p_group_id: groupId, p_group_name: groupName });
+  if (error) return alert('Kaydedilemedi: ' + error.message);
+  data.jtDirty = false;
+  load(true);
+}
+
+/** Kurulum kartındaki JetTakip özeti */
+function jettakipBlock(i) {
+  const st = i.status || {};
+  const j = st.jettakip;
+  const stuck = ((data.jt && data.jt.stuck) || []).filter((o) => o.installation_id === i.id);
+  if (!j && !stuck.length) return '';
+  const t = (j && j.today) || {};
+  const links = ((j && j.links) || []).map((l) => `${esc(l.name)} → ${l.hasGroup ? esc(l.group || 'grup') : '<b>grup yok</b>'}`).join(' · ');
+  return `<div class="courier">
+      <div><b>JetTakip</b>${st.central ? ' · merkez' : ''} · bugün ${esc(t.today || 0)} gruba gitti, ${esc((t.onWay || 0) + (t.delivered || 0))} kurye aldı, ${esc(t.delivered || 0)} teslim${t.cancelled ? `, ${esc(t.cancelled)} iptal` : ''}</div>
+      <div class="muted">${links || 'Bağlı işletme yok.'}</div>
+      ${j && j.last_error ? `<div class="warnline">Merkeze ulaşılamıyor: ${esc(j.last_error)}</div>` : ''}
+      ${stuck.length ? `<div style="color:var(--red);font-weight:700">🔴 ${stuck.length} sipariş 3 dakikadır gruba iletilmedi</div>` : ''}
     </div>`;
 }
 
@@ -305,6 +444,7 @@ function renderDefaults() {
 
 function render() {
   renderDefaults();
+  const jtProblems = renderJetTakip();
   $('globalSwitch').checked = data.globalEnabled;
   const list = $('list');
   const now = Date.now();
@@ -342,6 +482,7 @@ function render() {
         <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
       </div>
+      ${jettakipBlock(i)}
       ${courierBlock(st.courier)}
       <details class="pkg settings"><summary>Ayarlar${(i.settings_override || {})._rev && (i.settings_override || {})._rev !== (i.status || {}).settings_applied_rev ? ' (⏳ gönderim bekliyor)' : ''}</summary>
         ${settingsBlock(i)}
@@ -371,7 +512,7 @@ function render() {
     });
     list.appendChild(card);
   }
-  $('summary').textContent = `${data.installations.length} işletme · ${online} çevrimiçi · ${problems} dikkat gerektiren`;
+  $('summary').textContent = `${data.installations.length} işletme · ${online} çevrimiçi · ${problems} dikkat gerektiren${jtProblems ? ` · ${jtProblems} JetTakip uyarısı` : ''}`;
 }
 
 // ------------------------------------------------------------------ işlemler
