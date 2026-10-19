@@ -173,6 +173,7 @@ const FEATURES = [
   { key: 'courier_tracking', label: 'Kurye takibi (alma, hatırlatma, kurye bazlı rapor)', defaultOff: true },
   { key: 'courier_tracking_live', label: 'Kurye takibi: gerçek mod (kapalıysa sessiz)', defaultOff: true },
   { key: 'jettakip', label: 'JetTakip entegrasyonu (API siparişleri)', defaultOff: true },
+  { key: 'migros', label: 'Migros Yemek bağlantısı (Chrome eklentisi)', defaultOff: true },
 ];
 const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
 
@@ -421,8 +422,43 @@ function settingsBlock(i) {
       <label class="full">Restoran konumu (koordinat)<input type="text" data-k="RESTAURANT_LOCATION" value="${esc(v.RESTAURANT_LOCATION || '')}" placeholder="41.40123, 27.35678"/></label>
       ${chk('PRINT_TRENDYOL', 'Program Trendyol/Getir fişi bassın')}
       ${chk('PRINT_YEMEKSEPETI', 'Program Yemeksepeti fişi bassın')}
+      ${migrosSettings(v, cur, st)}
     </div>
     <div class="actions" style="margin-top:8px"><button class="primary" data-act="saveSettings">Kaydet ve gönder</button></div>`;
+}
+
+/**
+ * Migros ayarları sadece bu ayarları tanıyan programlarda gösterilir (program ayar özetinde
+ * MIGROS_* varsa). Eski sürüm tanımadığı ayarı reddeder ve o zaman HİÇBİR ayar uygulanmaz.
+ */
+function migrosSettings(v, cur, st) {
+  if (!cur || !('MIGROS_AUTO_ACCEPT' in cur)) return '';
+  const chk = (k, label) => `<label class="chk"><input type="checkbox" data-k="${k}" ${isTrue(v[k]) ? 'checked' : ''}/> ${label}</label>`;
+  const stores = (st.migros && st.migros.stores) || [];
+  const found = stores.length ? 'Panelden bulunan: ' + stores.map((s) => `${esc(s.name || 'şube')} (${esc(s.id)})`).join(', ') : 'Henüz şube bulunmadı';
+  return `
+      ${chk('MIGROS_AUTO_ACCEPT', 'Otomatik kabul (Migros Yemek)')}
+      ${chk('MIGROS_AUTO_ACCEPT_DRY_RUN', 'Migros kuru deneme (gerçekte kabul etmez)')}
+      <label class="full">Migros şube no (boş: otomatik)<input type="text" inputmode="numeric" data-k="MIGROS_STORE_ID" value="${esc(v.MIGROS_STORE_ID || '')}"/>
+        <span class="muted">${found}${stores.length > 1 && !v.MIGROS_STORE_ID ? ' — ⚠️ birden fazla şube, seçilmeli' : ''}</span></label>
+      ${chk('PRINT_MIGROS', 'Program Migros fişi bassın')}`;
+}
+
+/** İşletme kartında Migros satırı (özellik açıksa) */
+function migrosLine(st) {
+  const m = st.migros;
+  if (!m) return '';
+  const fresh = m.last_ping_at && Date.now() - new Date(m.last_ping_at).getTime() < 3 * 60 * 1000;
+  let text;
+  if (!fresh) text = '❌ panel açık değil';
+  else if (m.session_ok === false) text = '❌ panele giriş yapılmamış';
+  else if (!m.store_id) text = (m.stores || []).length > 1 ? '⚠️ şube seçilmeli' : '⚠️ restoran bekleniyor';
+  else {
+    const s = (m.stores || []).find((x) => x.id === m.store_id);
+    text = `✅ ${esc((s && s.name) || 'şube')} (${esc(m.store_id)}${m.store_source === 'ayar' ? ', ayardan' : ''})`;
+  }
+  const mode = m.auto_accept ? (m.dry_run ? 'kabul: kuru deneme' : 'otomatik kabul') : 'kabul: elle';
+  return `<div><span>Migros Yemek</span>${text} · ${mode}</div>`;
 }
 
 async function saveSettings(i, card) {
@@ -481,6 +517,7 @@ function render() {
         <div><span>Kaynak</span>${esc(st.source_name || '-')}</div>
         <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
+        ${migrosLine(st)}
       </div>
       ${jettakipBlock(i)}
       ${courierBlock(st.courier)}
