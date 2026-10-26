@@ -74,6 +74,15 @@
   table.jt select { width:100%; padding:5px; border:1px solid var(--line); border-radius:6px; font: inherit; margin:0; }
   .env { font-size: 11px; padding: 1px 6px; border-radius: 999px; background:#ddf4ff; color:#0969da; }
   .env.live { background:#dafbe1; color:#116329; }
+  .codebig { font: 700 30px/1.2 Consolas, "Cascadia Mono", monospace; letter-spacing: .12em; text-align:center; padding: 12px; border: 2px dashed var(--line); border-radius: 10px; background:#f6f8fa; user-select: all; margin: 8px 0; }
+  .steps { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .stp { font-size: 12px; padding: 3px 9px; border-radius: 999px; background:#eaeef2; color: var(--muted); white-space: nowrap; }
+  .stp.done { background:#dafbe1; color:#116329; }
+  .stp.now { background:#fff8c5; color:#7d4e00; font-weight: 700; }
+  .stp.err { background:#ffebe9; color:#a40e26; font-weight: 700; }
+  .setupitem { border-top: 1px solid var(--line); padding: 10px 0; }
+  .setupitem:first-child { border-top: none; padding-top: 0; }
+  #newMsg { white-space: pre-line; }
 </style>
 </head>
 <body>
@@ -105,7 +114,35 @@
     <div class="tabs">
       <button id="tabInst" class="active">İşletmeler</button>
       <button id="tabReport">Sipariş sayıları</button>
+      <button id="tabSetup">Yeni kurulum</button>
     </div>
+    <section id="setupView" class="hidden">
+      <div id="codeBox"></div>
+      <div class="card">
+        <div class="row"><div class="grow"><div class="name" id="newTitle">Yeni işletme</div>
+          <div class="muted">Kaydedince <b>24 saat geçerli, tek kullanımlık</b> bir kurulum kodu üretilir. Program ilk açılışta bu kodu ister ve ayarları buradan alır; sonra sadece WhatsApp QR'ı ve kurye grubu eşleştirmesi kalır. <b>Trendyol API bilgileri panele girilmez</b>: kurulumdan sonra programda, işletme bilgisayarında girilir.</div></div></div>
+        <div class="sform">
+          <label class="full">İşletme adı<input type="text" id="nName" maxlength="80" autocomplete="off" /></label>
+          <label>Sipariş kaynağı<select id="nSource"><option value="trendyolgo">Trendyol Yemek / Getir</option><option value="none">Trendyol yok (Yemeksepeti + telefon siparişi)</option></select></label>
+          <label class="chk"><input type="checkbox" id="nYs" /> Yemeksepeti siparişlerini de al</label>
+          <label class="full">Gün sonu raporu gidecek numaralar (her satıra bir)<textarea id="nReport" rows="2" placeholder="0555 111 22 33"></textarea></label>
+          <label>Gün sonu rapor saati<input type="time" id="nTime" value="23:30" /></label>
+          <label class="chk"><input type="checkbox" id="nCompany" /> Raporu kurye şirketi grubuna da gönder</label>
+          <label class="full">Sorun bildirimi numaraları (her satıra bir, isteğe bağlı)<textarea id="nAlerts" rows="2" placeholder="0555 111 22 33"></textarea></label>
+          <label class="full">Kurye şirketi destek numarası (isteğe bağlı)<input type="text" id="nSupport" placeholder="0555 111 22 33" autocomplete="off" /></label>
+        </div>
+        <details class="pkg" id="nFeaturesBox"><summary>Paket özellikleri — açılmazsa varsayılan paket</summary><div class="features" id="nFeatures"></div></details>
+        <div class="actions" style="margin-top:10px">
+          <button class="primary" id="btnCreateSetup">Kaydet ve kurulum kodu üret</button>
+          <button id="btnCancelEdit" class="hidden">Düzenlemeyi bırak</button>
+        </div>
+        <div id="newMsg" class="msg hidden"></div>
+      </div>
+      <div class="card">
+        <div class="name" style="margin-bottom:6px">Bekleyen ve son kurulumlar</div>
+        <div id="setupList" class="muted">-</div>
+      </div>
+    </section>
     <section id="reportView" class="card hidden">
       <div class="row">
         <div class="grow"><b>Aylık sipariş sayıları</b><div class="muted">Programların bildirdiği teslimatlar. Müşteri bilgisi tutulmaz.</div></div>
@@ -209,22 +246,29 @@ async function logout() {
 
 // ------------------------------------------------------------------ veri
 async function load(force) {
-  const [inst, g, cmds, logs, jt] = await Promise.all([
+  const [inst, g, cmds, logs, jt, codes] = await Promise.all([
     db.from('installations').select('*').order('business_name', { ascending: true }),
     db.from('settings').select('*'),
     db.from('commands').select('*').order('created_at', { ascending: false }).limit(300),
     db.from('logs').select('id, installation_id, created_at').order('created_at', { ascending: false }).limit(300),
     db.rpc('jettakip_admin_overview'),
+    db.from('setup_codes').select('installation_id, created_at, expires_at, used_at, cancelled_at').order('created_at', { ascending: false }).limit(300),
   ]);
   // JetTakip SQL'i (2.7) çalıştırılmamışsa bölüm gizli kalır
   data.jt = jt && !jt.error && jt.data ? jt.data : null;
+  // Kurulum kodu SQL'i (2.8) çalıştırılmamışsa "Yeni kurulum" sekmesi uyarı gösterir
+  data.setupReady = Boolean(codes && !codes.error);
+  data.setupCodes = (codes && codes.data) || [];
   if (g.error || !g.data || g.data.length === 0) return false; // yönetici değil
   const settingsByKey = Object.fromEntries(g.data.map((r) => [r.key, r.value]));
   data.featureDefaults = settingsByKey.feature_defaults || {};
-  data.installations = inst.data || [];
+  data.allInstallations = inst.data || [];
+  // Panelde açılıp kodu henüz kullanılmamış kayıtlar sadece "Yeni kurulum" sekmesinde görünür
+  data.installations = data.allInstallations.filter((i) => i.setup_state !== 'pending');
   data.commands = cmds.data || [];
   data.logs = logs.data || [];
   data.globalEnabled = !(settingsByKey.global && settingsByKey.global.enabled === false);
+  renderSetup(); // "Yeni kurulum" formu yeniden çizilmez, sadece listeler
   if (!force && (document.querySelector('details.settings[open]') || data.jtDirty)) {
     $('lastRefresh').textContent = 'ayar formu açık, yenileme duraklatıldı';
     return true;
@@ -519,6 +563,7 @@ function render() {
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
         ${migrosLine(st)}
       </div>
+      ${setupProgressBlock(i)}
       ${jettakipBlock(i)}
       ${courierBlock(st.courier)}
       <details class="pkg settings"><summary>Ayarlar${(i.settings_override || {})._rev && (i.settings_override || {})._rev !== (i.status || {}).settings_applied_rev ? ' (⏳ gönderim bekliyor)' : ''}</summary>
@@ -550,6 +595,303 @@ function render() {
     list.appendChild(card);
   }
   $('summary').textContent = `${data.installations.length} işletme · ${online} çevrimiçi · ${problems} dikkat gerektiren${jtProblems ? ` · ${jtProblems} JetTakip uyarısı` : ''}`;
+}
+
+// ------------------------------------------------------------------ kurulum kodu (2.8)
+// Programdaki normalizePhone ile aynı kural: "0555 111 22 33" → "905551112233"
+function normalizePhone(input) {
+  let d = String(input).replace(/\D/g, '');
+  if (!d) return null;
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.length === 11 && d.startsWith('05')) d = '9' + d;
+  else if (d.length === 10 && d.startsWith('5')) d = '90' + d;
+  if (d.startsWith('90') && d.length !== 12) return null;
+  if (d.length < 10 || d.length > 15) return null;
+  return d;
+}
+function phoneList(text, label, errors) {
+  const out = [];
+  for (const part of String(text || '').split(/[\n,;]+/)) {
+    if (!part.trim()) continue;
+    const p = normalizePhone(part);
+    if (!p) errors.push(`${label}: "${part.trim()}" anlaşılamadı (ör. 0555 111 22 33)`);
+    else if (!out.includes(p)) out.push(p);
+  }
+  return out;
+}
+const fmtPhone = (p) => (/^90\d{10}$/.test(p) ? `0${p.slice(2, 5)} ${p.slice(5, 8)} ${p.slice(8, 10)} ${p.slice(10)}` : p);
+const fmtTime = (t) => new Date(t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const SOURCE_LABEL = { trendyolgo: 'Trendyol / Getir', none: 'Trendyol yok' };
+
+// Son girilen numaralar bu tarayıcıda hatırlanır (her kurulumda aynı numaralar yazılmasın)
+const LAST_KEY = 'kb-yeni-kurulum-son';
+function lastUsed() { try { return JSON.parse(localStorage.getItem(LAST_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function rememberUsed(v) { try { localStorage.setItem(LAST_KEY, JSON.stringify(v)); } catch (e) { /* tarayıcı izin vermezse önemli değil */ } }
+
+let editingId = null; // düzenlenen bekleyen kayıt
+let newFeaturesDrawn = false;
+data.lastCodes = {}; // üretilen kodlar sadece bu sayfa açıkken gösterilir (merkezde sadece özeti var)
+
+function drawNewFeatures(custom) {
+  const eff = { ...(data.featureDefaults || {}), ...(custom || {}) };
+  $('nFeatures').innerHTML = featureToggles(eff, custom || {}, 'new');
+  newFeaturesDrawn = true;
+}
+
+function resetNewForm() {
+  const last = lastUsed();
+  editingId = null;
+  $('newTitle').textContent = 'Yeni işletme';
+  $('btnCreateSetup').textContent = 'Kaydet ve kurulum kodu üret';
+  $('btnCancelEdit').classList.add('hidden');
+  $('nName').value = '';
+  setNewSource('trendyolgo', false);
+  $('nReport').value = last.report || '';
+  $('nTime').value = last.time || '23:30';
+  $('nCompany').checked = false; // karar (25.10): gün sonu raporu kurye şirketi grubuna varsayılan olarak gitmez
+  $('nAlerts').value = last.alerts || '';
+  $('nSupport').value = last.support || '';
+  $('nFeaturesBox').open = false;
+  drawNewFeatures(null);
+}
+
+// "Trendyol yok" ise Yemeksepeti zorunlu; geri dönülünce kutu önceki haline döner
+let ysBeforeNone = null;
+function syncNewSource() {
+  const none = $('nSource').value === 'none';
+  const ys = $('nYs');
+  if (none && !ys.disabled) { ysBeforeNone = ys.checked; ys.checked = true; }
+  if (!none && ys.disabled && ysBeforeNone !== null) { ys.checked = ysBeforeNone; ysBeforeNone = null; }
+  ys.disabled = none;
+}
+function setNewSource(source, ysChecked) {
+  ysBeforeNone = null;
+  $('nYs').disabled = false;
+  $('nYs').checked = ysChecked;
+  $('nSource').value = source;
+  syncNewSource();
+}
+
+function readNewForm() {
+  const errors = [];
+  const name = $('nName').value.trim();
+  if (!name) errors.push('İşletme adı boş olamaz.');
+  const report = phoneList($('nReport').value, 'Rapor numarası', errors);
+  if (!report.length) errors.push('Gün sonu raporu için en az bir numara girin.');
+  const alerts = phoneList($('nAlerts').value, 'Bildirim numarası', errors);
+  let support = '';
+  if ($('nSupport').value.trim()) {
+    support = normalizePhone($('nSupport').value) || '';
+    if (!support) errors.push(`Destek numarası anlaşılamadı: "${$('nSupport').value.trim()}"`);
+  }
+  const time = $('nTime').value;
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) errors.push('Rapor saati SS:DD olmalı (ör. 23:30).');
+  const source = $('nSource').value;
+  const config = {
+    order_source: source,
+    ys_extension: source === 'none' ? true : $('nYs').checked,
+    report_phone_numbers: report,
+    report_time: time,
+    company_group_report: $('nCompany').checked,
+    alert_numbers: alerts,
+    support_phone: support,
+  };
+  // Sadece varsayılan paketten farklı olan özellikler işletmeye özel kaydedilir
+  const features = {};
+  $('nFeatures').querySelectorAll('input[data-feature]').forEach((el) => {
+    const f = FEATURES.find((x) => x.key === el.dataset.feature);
+    if (f && el.checked !== featureOn(data.featureDefaults || {}, f)) features[f.key] = el.checked;
+  });
+  return { errors, name, config, features };
+}
+
+function showNewMsg(kind, text) {
+  $('newMsg').className = `msg ${kind}`;
+  $('newMsg').textContent = text;
+}
+
+async function createSetup() {
+  const f = readNewForm();
+  if (f.errors.length) return showNewMsg('err', f.errors.join('\n'));
+  const btn = $('btnCreateSetup');
+  btn.disabled = true;
+  try {
+    if (editingId) {
+      const { error } = await db.rpc('setup_admin_update', { p_installation: editingId, p_business_name: f.name, p_config: f.config, p_features: f.features });
+      if (error) return showNewMsg('err', 'Kaydedilemedi: ' + error.message);
+      showNewMsg('ok', `${f.name}: bilgiler güncellendi. Kod aynı kaldı.`);
+    } else {
+      const { data: r, error } = await db.rpc('setup_admin_create', { p_business_name: f.name, p_config: f.config, p_features: f.features });
+      if (error) return showNewMsg('err', 'Kaydedilemedi: ' + error.message);
+      data.lastCodes[r.installation_id] = { code: r.code, expires_at: r.expires_at, name: f.name };
+      showNewMsg('ok', `${f.name} kaydedildi. Kurulum kodu yukarıda.`);
+    }
+    rememberUsed({ report: $('nReport').value, time: $('nTime').value, alerts: $('nAlerts').value, support: $('nSupport').value });
+    resetNewForm();
+    await load(true);
+    window.scrollTo(0, 0); // kod kutusu sayfanın üstünde
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function editSetup(i) {
+  const c = i.setup_config || {};
+  editingId = i.id;
+  $('newTitle').textContent = `Düzenleniyor: ${i.business_name || ''}`;
+  $('btnCreateSetup').textContent = 'Değişiklikleri kaydet';
+  $('btnCancelEdit').classList.remove('hidden');
+  $('nName').value = i.business_name || '';
+  setNewSource(c.order_source === 'none' ? 'none' : 'trendyolgo', c.ys_extension === true);
+  $('nReport').value = (c.report_phone_numbers || []).map(fmtPhone).join('\n');
+  $('nTime').value = c.report_time || '23:30';
+  $('nCompany').checked = c.company_group_report === true;
+  $('nAlerts').value = (c.alert_numbers || []).map(fmtPhone).join('\n');
+  $('nSupport').value = c.support_phone ? fmtPhone(c.support_phone) : '';
+  drawNewFeatures(i.features || {});
+  $('newMsg').classList.add('hidden');
+  window.scrollTo(0, 0);
+}
+
+/** Kodun durumu: en son üretilen kod */
+function codeState(instId) {
+  const c = data.setupCodes.find((x) => x.installation_id === instId);
+  if (!c) return { state: 'none', text: 'Kod yok' };
+  if (c.used_at) return { state: 'used', text: `Kod kullanıldı (${fmtTime(c.used_at)})`, c };
+  if (c.cancelled_at) return { state: 'cancelled', text: 'Kod iptal edildi', c };
+  if (Date.parse(c.expires_at) < Date.now()) return { state: 'expired', text: 'Kodun süresi doldu', c };
+  return { state: 'valid', text: `Kod geçerli — ${fmtTime(c.expires_at)} saatine kadar`, c };
+}
+
+/** Kodla kurulan işletmenin ilerlemesi (programın durum bildiriminden) */
+function setupSteps(i) {
+  const st = i.status || {};
+  const key = (st.health && st.health.key) || '';
+  const trendyol = (i.setup_config || {}).order_source === 'trendyolgo';
+  const wa = Boolean(st.wa_number);
+  const group = Boolean(st.courier_group_id);
+  const steps = [
+    ['Kod girildi', 'done'],
+    ['WhatsApp bağlantısı', wa ? 'done' : key === 'qr' || !key ? 'now' : 'wait'],
+    ['Kurye grubu eşleştirmesi', group ? 'done' : wa ? 'now' : 'wait'],
+  ];
+  if (trendyol) {
+    // ✓ sadece Trendyol'a ilk BAŞARILI sorgudan sonra; bilgiler reddedildiyse kırmızı "hatalı"
+    let ty = 'wait';
+    if (st.source_auth_error) ty = 'err';
+    else if (!st.trendyol_pending && st.last_poll_ok_at && st.source_name && !/bekleniyor/i.test(st.source_name)) ty = 'done';
+    else if (group) ty = 'now';
+    steps.push([ty === 'err' ? 'Trendyol bilgileri hatalı' : 'Trendyol bilgileri', ty]);
+  }
+  const allBefore = steps.every((s) => s[1] === 'done');
+  steps.push(['Çalışıyor', allBefore && key === 'ok' ? 'done' : allBefore ? 'now' : 'wait']);
+  return steps;
+}
+const stepsHtml = (steps) => `<div class="steps">${steps.map(([t, s]) => `<span class="stp ${s}">${s === 'done' ? '✓ ' : s === 'now' ? '● ' : s === 'err' ? '✗ ' : ''}${esc(t)}</span>`).join('')}</div>`;
+const setupDone = (i) => setupSteps(i).every((s) => s[1] === 'done');
+
+/** İşletme kartında: kodla kuruldu ve kurulum bitmedi */
+function setupProgressBlock(i) {
+  if (i.setup_state !== 'claimed' || setupDone(i)) return '';
+  return `<div class="courier"><b>Kurulum ilerlemesi</b> (kodla kuruldu ${esc(ago(i.setup_claimed_at))})${stepsHtml(setupSteps(i))}</div>`;
+}
+
+function codeBoxHtml() {
+  const entries = Object.entries(data.lastCodes).filter(([id]) => {
+    const i = data.allInstallations.find((x) => x.id === id);
+    return i && i.setup_state === 'pending' && codeState(id).state === 'valid';
+  });
+  return entries.map(([id, c]) => `
+    <div class="card" data-code-inst="${esc(id)}">
+      <div class="row"><div class="grow"><b>${esc(c.name || '')}</b> — kurulum kodu</div><button data-copy="${esc(c.code)}">Kopyala</button></div>
+      <div class="codebig">${esc(c.code)}</div>
+      <div class="muted">${esc(fmtTime(c.expires_at))} saatine kadar geçerli, tek kullanımlık. Program ilk açılışta "Kurulum kodunuz var mı?" ekranında bu kodu ister. Bu kod bir daha gösterilmez; kaybolursa "Yeni kod üret" ile yenisini alın.</div>
+    </div>`).join('');
+}
+
+function renderSetup() {
+  if (!$('setupView')) return;
+  if (!data.setupReady) {
+    $('setupList').innerHTML = '⚠️ Kurulum kodu için Supabase SQL\'i çalıştırılmamış (supabase/migrations/20261025120000_kurulum_kodu.sql).';
+    $('btnCreateSetup').disabled = true;
+    return;
+  }
+  $('btnCreateSetup').disabled = false;
+  if (!newFeaturesDrawn) resetNewForm();
+  $('codeBox').innerHTML = codeBoxHtml();
+  $('codeBox').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => copyCode(b)));
+
+  const week = Date.now() - 7 * 24 * 3600e3;
+  const items = data.allInstallations
+    .filter((i) => i.setup_state === 'pending' || (i.setup_state === 'claimed' && Date.parse(i.setup_claimed_at) > week))
+    .sort((a, b) => Date.parse(b.setup_claimed_at || b.setup_created_at || 0) - Date.parse(a.setup_claimed_at || a.setup_created_at || 0));
+  if (!items.length) {
+    $('setupList').innerHTML = 'Bekleyen kurulum yok.';
+    return;
+  }
+  $('setupList').innerHTML = items.map((i) => {
+    const cfg = i.setup_config || {};
+    const src = SOURCE_LABEL[cfg.order_source] || '-';
+    if (i.setup_state === 'pending') {
+      const cs = codeState(i.id);
+      return `<div class="setupitem" data-setup="${esc(i.id)}">
+        <div class="row"><div class="grow"><b>${esc(i.business_name)}</b> · ${esc(src)}${cfg.ys_extension ? ' + Yemeksepeti' : ''}
+          <div class="muted">Açıldı ${esc(ago(i.setup_created_at))} · ${cs.state === 'valid' ? '🟢' : '⚪'} ${esc(cs.text)}</div></div></div>
+        <div class="actions" style="margin-top:6px">
+          <button data-sa="newcode">Yeni kod üret</button>
+          ${cs.state === 'valid' ? '<button data-sa="cancel">Kodu iptal et</button>' : ''}
+          <button data-sa="edit">Düzenle</button>
+          <button data-sa="delete">Kaydı sil</button>
+        </div></div>`;
+    }
+    const st = i.status || {};
+    const online = instOnline(i);
+    return `<div class="setupitem">
+      <div><b>${esc(i.business_name)}</b> · ${esc(src)} · kodla kuruldu ${esc(ago(i.setup_claimed_at))}${setupDone(i) ? ' · ✅ kurulum tamamlandı' : ''}</div>
+      <div class="muted">${online ? 'Şu an: ' + esc((st.health && st.health.label) || '-') : 'Çevrimdışı — son görülme ' + esc(ago(i.last_seen))}</div>
+      ${stepsHtml(setupSteps(i))}
+    </div>`;
+  }).join('');
+  $('setupList').querySelectorAll('[data-setup]').forEach((row) => {
+    const i = data.allInstallations.find((x) => x.id === row.dataset.setup);
+    row.querySelectorAll('[data-sa]').forEach((b) => (b.onclick = () => setupAction(i, b.dataset.sa)));
+  });
+}
+
+async function copyCode(btn) {
+  const code = btn.dataset.copy;
+  try {
+    await navigator.clipboard.writeText(code);
+    btn.textContent = 'Kopyalandı ✓';
+  } catch (e) {
+    prompt('Kodu kopyalayın:', code); // pano izni yoksa
+  }
+  setTimeout(() => (btn.textContent = 'Kopyala'), 2000);
+}
+
+async function setupAction(i, act) {
+  if (!i) return;
+  if (act === 'newcode') {
+    if (!confirm(`${i.business_name}: yeni kurulum kodu üretilsin mi?\n\nVarsa eski kod geçersiz olur.`)) return;
+    const { data: r, error } = await db.rpc('setup_admin_new_code', { p_installation: i.id });
+    if (error) return alert('Kod üretilemedi: ' + error.message);
+    data.lastCodes[i.id] = { code: r.code, expires_at: r.expires_at, name: i.business_name };
+  } else if (act === 'cancel') {
+    if (!confirm(`${i.business_name}: kurulum kodu iptal edilsin mi?\n\nKayıt kalır; istediğinizde yeni kod üretebilirsiniz.`)) return;
+    const { error } = await db.rpc('setup_admin_cancel_code', { p_installation: i.id });
+    if (error) return alert('İptal edilemedi: ' + error.message);
+    delete data.lastCodes[i.id];
+  } else if (act === 'edit') {
+    return editSetup(i);
+  } else if (act === 'delete') {
+    if (!confirm(`${i.business_name}: bekleyen kurulum kaydı silinsin mi?\n\nKodu da geçersiz olur.`)) return;
+    const { error } = await db.from('installations').delete().eq('id', i.id).eq('setup_state', 'pending');
+    if (error) return alert('Silinemedi: ' + error.message);
+    delete data.lastCodes[i.id];
+    if (editingId === i.id) resetNewForm();
+    $('newMsg').classList.add('hidden');
+  }
+  load(true);
 }
 
 // ------------------------------------------------------------------ işlemler
@@ -640,9 +982,12 @@ function downloadCsv() {
 function showTab(which) {
   $('tabInst').classList.toggle('active', which === 'inst');
   $('tabReport').classList.toggle('active', which === 'report');
+  $('tabSetup').classList.toggle('active', which === 'setup');
   $('instView').classList.toggle('hidden', which !== 'inst');
   $('reportView').classList.toggle('hidden', which !== 'report');
+  $('setupView').classList.toggle('hidden', which !== 'setup');
   if (which === 'report') loadReport();
+  if (which === 'setup') renderSetup();
 }
 
 async function setGlobal(enabled) {
@@ -699,6 +1044,10 @@ $('globalSwitch').onchange = () => setGlobal($('globalSwitch').checked);
 $('btnCloseLog').onclick = () => $('logDialog').close();
 $('tabInst').onclick = () => showTab('inst');
 $('tabReport').onclick = () => showTab('report');
+$('tabSetup').onclick = () => showTab('setup');
+$('nSource').onchange = syncNewSource;
+$('btnCreateSetup').onclick = createSetup;
+$('btnCancelEdit').onclick = () => { resetNewForm(); $('newMsg').classList.add('hidden'); };
 $('month').value = new Date().toISOString().slice(0, 7);
 $('month').onchange = loadReport;
 $('btnCsv').onclick = downloadCsv;
