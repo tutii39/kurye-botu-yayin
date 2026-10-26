@@ -83,6 +83,11 @@
   .setupitem { border-top: 1px solid var(--line); padding: 10px 0; }
   .setupitem:first-child { border-top: none; padding-top: 0; }
   #newMsg { white-space: pre-line; }
+  .badge.arch { background:#fff8c5; color:#7d4e00; font-weight: 700; }
+  #archBox > summary { cursor: pointer; font-weight: 700; }
+  .architem { border-top: 1px solid var(--line); padding: 10px 0; }
+  .architem:first-child { border-top: none; }
+  .architem .actions { margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -164,7 +169,13 @@
       <span id="lastRefresh"></span>
       <button id="btnRefresh">Yenile</button>
     </div>
+    <div id="archWarn"></div>
     <div id="list"></div>
+    <details id="archBox" class="card hidden">
+      <summary id="archSummary">Arşivlenenler</summary>
+      <p class="muted" style="margin:6px 0">Arşiv sadece bu listeyi sadeleştirir: kayıtlar, paket özellikleri, sipariş sayıları ve JetTakip bağı durur; programlar etkilenmez. "Geri al" kurulumu listeye döndürür.</p>
+      <div id="archList"></div>
+    </details>
     </div>
   </section>
 </main>
@@ -312,9 +323,14 @@ function courierBlock(c) {
 const minsAgo = (t) => Math.max(0, Math.round((Date.now() - Date.parse(t)) / 60000));
 const instName = (id) => {
   const i = data.installations.find((x) => x.id === id);
-  return i ? i.business_name || 'İsimsiz kurulum' : 'Silinmiş kurulum';
+  return i ? (i.business_name || 'İsimsiz kurulum') + (isArchived(i) ? ' (arşivde)' : '') : 'Silinmiş kurulum';
 };
 const instOnline = (i) => Boolean(i && i.last_seen && Date.now() - Date.parse(i.last_seen) < ONLINE_MS);
+// Arşiv sadece panel görünürlüğü (archived_at); program etkilenmez, kayıt ve verisi durur.
+const isArchived = (i) => Boolean(i && i.archived_at);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const seenWithinDay = (i) => Boolean(i && i.last_seen && Date.now() - Date.parse(i.last_seen) < DAY_MS);
+const plainName = (i) => i.business_name || 'İsimsiz kurulum';
 
 /** 3 dakikadır gruba iletilmemiş siparişin sebebi */
 function stuckReason(o) {
@@ -365,8 +381,10 @@ function renderJetTakip() {
   const doubles = doubleOrderWarnings().map((w) => `<div class="jt-alert">⚠️ ${w.text}</div>`).join('');
   const rows = rests.map((r) => {
     const inst = data.installations.find((x) => x.id === r.installation_id);
+    // Arşivdeki kurulumlar yeni bağlama listesinde çıkmaz; mevcut bağ seçili kalır.
     const instOpts = `<option value="">— bağlı değil —</option>` + data.installations
-      .map((i) => `<option value="${i.id}" ${i.id === r.installation_id ? 'selected' : ''}>${esc(i.business_name || 'İsimsiz')}${(i.status || {}).central ? ' (merkez)' : ''}</option>`).join('');
+      .filter((i) => !isArchived(i) || i.id === r.installation_id)
+      .map((i) => `<option value="${i.id}" ${i.id === r.installation_id ? 'selected' : ''}>${esc(i.business_name || 'İsimsiz')}${(i.status || {}).central ? ' (merkez)' : ''}${isArchived(i) ? ' (arşivde)' : ''}</option>`).join('');
     const reported = inst && (inst.status || {}).jettakip;
     const gHint = !inst ? '' : !reported ? '<div class="muted">Bu kurulumda JetTakip kapalı ya da grup listesi henüz gelmedi.</div>' : '';
     return `<tr data-link="${r.id}">
@@ -529,11 +547,15 @@ function render() {
   const list = $('list');
   const now = Date.now();
   let online = 0, problems = 0;
+  const active = data.installations.filter((i) => !isArchived(i));
+  const archived = data.installations.filter(isArchived);
   list.innerHTML = '';
-  if (data.installations.length === 0) {
-    list.innerHTML = '<div class="card muted">Henüz bağlanan program yok. Program kurulduğunda burada otomatik görünür.</div>';
+  if (active.length === 0) {
+    list.innerHTML = archived.length
+      ? `<div class="card muted">Listede kurulum yok (${archived.length} kurulum arşivde, en altta).</div>`
+      : '<div class="card muted">Henüz bağlanan program yok. Program kurulduğunda burada otomatik görünür.</div>';
   }
-  for (const i of data.installations) {
+  for (const i of active) {
     const st = i.status || {};
     const isOnline = i.last_seen && now - Date.parse(i.last_seen) < ONLINE_MS;
     if (isOnline) online++;
@@ -582,7 +604,7 @@ function render() {
         <button data-act="logs" ${hasLog ? '' : 'disabled'}>Kayıtları gör</button>
         <button data-act="cmd" data-type="update_now">Şimdi güncelle</button>
         <button data-act="note">Not</button>
-        <button data-act="delete">Sil</button>
+        <button data-act="archive">Arşivle</button>
       </div>`;
     card.querySelectorAll('input[data-feature]').forEach((el) => (el.onchange = () => setInstFeature(i, el.dataset.feature, el.checked, el)));
     card.querySelectorAll('[data-act]').forEach((el) => {
@@ -594,7 +616,55 @@ function render() {
     });
     list.appendChild(card);
   }
-  $('summary').textContent = `${data.installations.length} işletme · ${online} çevrimiçi · ${problems} dikkat gerektiren${jtProblems ? ` · ${jtProblems} JetTakip uyarısı` : ''}`;
+  // Arşivde ama çalışan kurulum olağan dışıdır: "dikkat gerektiren" sayısına girer, üstte sarı satır.
+  const runningArchived = archived.filter(instOnline);
+  problems += runningArchived.length;
+  renderArchived(archived, runningArchived);
+  $('summary').textContent = `${active.length} işletme · ${online} çevrimiçi · ${problems} dikkat gerektiren${jtProblems ? ` · ${jtProblems} JetTakip uyarısı` : ''}${archived.length ? ` · ${archived.length} arşivde` : ''}`;
+}
+
+function renderArchived(archived, running) {
+  const box = $('archBox');
+  box.classList.toggle('hidden', archived.length === 0);
+  $('archSummary').textContent = `Arşivlenenler (${archived.length})${running.length ? ` · ${running.length} tanesi çalışıyor` : ''}`;
+  // Yeni çalışan arşivli kurulum görülünce bölüm bir kez açılır (sonra kullanıcı kapatabilir).
+  const runIds = running.map((i) => i.id).sort().join(',');
+  if (runIds && runIds !== data.archRunIds) box.open = true;
+  data.archRunIds = runIds;
+  $('archWarn').innerHTML = running.length
+    ? `<div class="jt-warn">⚠️ ${running.length} arşivlenmiş kurulum hâlâ çalışıyor: ${running.map((i) => {
+        const h = (i.status || {}).health || {};
+        const bad = h.color === 'red' ? `kırmızı — ${esc(h.label || 'sorun var')}` : h.color === 'yellow' ? `sarı — ${esc(h.label || 'uyarı')}` : '';
+        return `<b>${esc(plainName(i))}</b>${bad ? ` (${bad})` : ''}`;
+      }).join(', ')}. Program siparişleri iletmeye devam ediyor. En alttaki "Arşivlenenler" bölümüne bakın.</div>`
+    : '';
+  const listEl = $('archList');
+  listEl.innerHTML = '';
+  for (const i of archived) {
+    const st = i.status || {};
+    const on = instOnline(i);
+    const color = !on ? 'gray' : (st.health && st.health.color) || 'gray';
+    const row = document.createElement('div');
+    row.className = 'architem';
+    row.dataset.arch = i.id;
+    row.innerHTML = `
+      <div class="row">
+        <span class="dot ${color}"></span>
+        <div class="grow">
+          <div class="name">${esc(plainName(i))}</div>
+          <div class="muted">${on ? 'Şu an: ' + esc((st.health && st.health.label) || '-') : 'Son görülme ' + esc(ago(i.last_seen))} · arşivlendi ${esc(ago(i.archived_at))} · sürüm ${esc(i.version || '-')}</div>
+        </div>
+        ${on ? '<span class="badge arch">Arşivde ama çalışıyor</span>' : ''}
+        ${i.enabled ? '' : '<span class="badge off">KAPALI</span>'}
+      </div>
+      ${i.note ? `<div class="note">📝 ${esc(i.note)}</div>` : ''}
+      <div class="actions">
+        <button data-act="unarchive">Geri al</button>
+        <button data-act="purge" class="danger">Kalıcı olarak sil</button>
+      </div>`;
+    row.querySelectorAll('[data-act]').forEach((el) => (el.onclick = () => action(i, el.getAttribute('data-act'))));
+    listEl.appendChild(row);
+  }
 }
 
 // ------------------------------------------------------------------ kurulum kodu (2.8)
@@ -1028,11 +1098,74 @@ async function action(i, act, type) {
     await db.from('installations').update({ note: note.trim() || null }).eq('id', i.id);
     return load();
   }
-  if (act === 'delete') {
-    if (!confirm(`${i.business_name} listeden silinsin mi?\n\nProgram hâlâ kuruluysa bir dakika içinde yeniden görünür. Sadece kaldırılmış kurulumları silin.`)) return;
-    await db.from('installations').delete().eq('id', i.id);
-    return load();
+  if (act === 'archive') return archiveInstallation(i);
+  if (act === 'unarchive') {
+    const { error } = await db.from('installations').update({ archived_at: null }).eq('id', i.id);
+    if (error) alert('Geri alınamadı: ' + error.message);
+    return load(true);
   }
+  if (act === 'purge') return purgeInstallation(i);
+}
+
+const KEEP_TEXT = 'Hiçbir şey silinmez: paket özellikleri, not, ayarlar, sipariş sayıları ve JetTakip bağı aynen kalır.';
+
+async function archiveInstallation(i) {
+  const name = plainName(i);
+  if (!seenWithinDay(i)) {
+    if (!confirm(`${name} arşivlensin mi?\n\nListeden kalkar, en alttaki "Arşivlenenler" bölümünde durur; "Geri al" ile tek tıkla döner.\n${KEEP_TEXT}\nProgram etkilenmez.`)) return;
+  } else {
+    // Son 24 saatte haber vermiş (büyük ihtimalle çalışan) kurulum: işletme adı aynen yazılmalı.
+    const typed = prompt(
+      `${name} ${ago(i.last_seen)} merkeze haber verdi, yani büyük ihtimalle ÇALIŞIYOR.\n\n` +
+      'Arşivlemek programı DURDURMAZ: siparişler gruba gitmeye, gün sonu raporu ve JetTakip siparişleri gelmeye devam eder. ' +
+      'Kurulum sadece bu listeden kalkar; çalıştığı sürece "Arşivlenenler"de "Arşivde ama çalışıyor" uyarısıyla görünür. ' +
+      'Programı durdurmak için kartındaki hizmet anahtarını kapatın.\n' +
+      `${KEEP_TEXT}\n\nOnaylamak için işletme adını aynen yazın:\n${name}`
+    );
+    if (typed === null) return;
+    if (typed.trim() !== name) return alert('Ad tutmadı, arşivlenmedi.');
+  }
+  const { error } = await db.from('installations').update({ archived_at: new Date().toISOString() }).eq('id', i.id);
+  if (error) alert('Arşivlenemedi: ' + error.message);
+  return load(true);
+}
+
+async function purgeInstallation(i) {
+  const name = plainName(i);
+  if (!isArchived(i)) return alert('Sadece arşivdeki kurulumlar kalıcı olarak silinebilir.');
+  if (instOnline(i)) {
+    return alert(`${name} şu an çalışıyor (son haber ${ago(i.last_seen)}). Kalıcı olarak silinemez: silinse bile program bir dakika içinde yeni ve boş bir kayıtla geri gelir.\n\nÖnce programı o bilgisayardan kaldırın; 3 dakika haber gelmeyince silebilirsiniz.`);
+  }
+  const { data: days, error: dErr } = await db.from('orders_daily').select('day').eq('installation_id', i.id).order('day', { ascending: true });
+  if (dErr) return alert('Sipariş sayıları okunamadı, silme yapılmadı: ' + dErr.message);
+  const lost = [];
+  const feats = Object.entries(i.features || {});
+  if (feats.length) {
+    const label = (k) => (FEATURES.find((f) => f.key === k) || { label: k }).label;
+    lost.push(`İşletmeye özel paket özellikleri (${feats.length}): ${feats.map(([k, v]) => `${label(k)} ${v ? 'açık' : 'kapalı'}`).join(', ')} → varsayılan pakete döner`);
+  } else lost.push('İşletmeye özel paket özelliği yok');
+  if (!i.enabled) lost.push('Hizmet askısı (şu an KAPALI) → kayıt geri gelirse hizmet açık başlar');
+  if (i.update_allowed) lost.push('"Yeni sürümleri alsın" (şu an açık)');
+  const sKeys = Object.keys(i.settings_override || {}).filter((k) => k !== '_rev');
+  if (sKeys.length) lost.push(`Panelden gönderilmiş ayarlar (${sKeys.length})`);
+  if (i.note) lost.push(`Not: "${i.note}"`);
+  const n = (days || []).length;
+  lost.push(n ? `Sipariş sayıları: ${n} günlük kayıt (${days[0].day} – ${days[n - 1].day}); raporlardan da çıkar` : 'Sipariş sayısı kaydı yok');
+  const links = ((data.jt && data.jt.restaurants) || []).filter((r) => r.installation_id === i.id);
+  if (links.length) lost.push(`JetTakip bağı: ${links.map((r) => r.name).join(', ')} bağsız kalır (siparişleri hiçbir gruba gitmez, kırmızı uyarı)`);
+  lost.push('Komut geçmişi, yüklenmiş kayıtlar ve kurulum kodu geçmişi');
+  const typed = prompt(
+    `${name} KALICI olarak silinsin mi? Geri alınamaz. Kaybolacaklar:\n\n- ${lost.join('\n- ')}\n\n` +
+    'Program hâlâ kuruluysa açıldığında yeni ve boş bir kayıtla yeniden görünür.\n\n' +
+    `Onaylamak için işletme adını aynen yazın:\n${name}`
+  );
+  if (typed === null) return;
+  if (typed.trim() !== name) return alert('Ad tutmadı, silinmedi.');
+  // Koşul: sadece arşivdeki kayıt silinir (ana listedeki bir kayıt bu yoldan silinemez).
+  const { data: gone, error } = await db.from('installations').delete().eq('id', i.id).not('archived_at', 'is', null).select('id');
+  if (error) alert('Silinemedi: ' + error.message);
+  else if (!gone || !gone.length) alert('Silinmedi: kayıt artık arşivde değil.');
+  return load(true);
 }
 
 // ------------------------------------------------------------------ başlangıç
