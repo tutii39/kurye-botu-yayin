@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Kurye Botu — Yönetim Paneli</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛵</text></svg>" />
+<title>JetTakip — Yönetim Paneli</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%3E%20%3Crect%20width%3D%221024%22%20height%3D%221024%22%20rx%3D%22200%22%20fill%3D%22%230B62D6%22%2F%3E%20%3Cg%20transform%3D%22translate(512%20512)%20skewX(-10)%20translate(-512%20-512)%22%20fill%3D%22%23FFFFFF%22%3E%20%3Crect%20x%3D%22200%22%20y%3D%22230%22%20width%3D%22680%22%20height%3D%22170%22%20rx%3D%2224%22%2F%3E%20%3Crect%20x%3D%22610%22%20y%3D%22260%22%20width%3D%22170%22%20height%3D%22560%22%20rx%3D%2224%22%2F%3E%20%3Cpath%20d%3D%22M%20290%20260%20H%20460%20V%20640%20A%20190%20190%200%200%201%2080%20640%20V%20610%20H%20250%20V%20640%20A%2020%2020%200%200%200%20290%20640%20Z%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E" />
 <style>
   :root { --bg:#f4f5f7; --card:#fff; --text:#1f2328; --muted:#57606a; --line:#d0d7de; --green:#1f883d; --yellow:#bf8700; --red:#cf222e; --gray:#6e7781; --blue:#0969da; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", Roboto, Arial, sans-serif; padding: env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0); }
   header { position: sticky; top: 0; z-index: 5; background: #24292f; color: #fff; padding: 12px 16px; display:flex; align-items:center; gap:10px; }
-  header h1 { font-size: 17px; margin: 0; flex: 1; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; display: flex; align-items: center; gap: 8px; }
+  header h1 .brandlogo svg { width: 24px; height: 24px; display: block; }
   header button { background: transparent; color: #fff; border: 1px solid #57606a; }
   main { max-width: 900px; margin: 0 auto; padding: 12px; }
   .card { background: var(--card); border:1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
@@ -92,7 +93,7 @@
 </head>
 <body>
 <header>
-  <h1>🛵 Kurye Botu — Yönetim</h1>
+  <h1><span class="brandlogo"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"> <rect width="1024" height="1024" rx="200" fill="#0B62D6"/> <g transform="translate(512 512) skewX(-10) translate(-512 -512)" fill="#FFFFFF"> <rect x="200" y="230" width="680" height="170" rx="24"/> <rect x="610" y="260" width="170" height="560" rx="24"/> <path d="M 290 260 H 460 V 640 A 190 190 0 0 1 80 640 V 610 H 250 V 640 A 20 20 0 0 0 290 640 Z"/> </g> </svg></span>JetTakip — Yönetim</h1>
   <button id="btnLogout" class="hidden">Çıkış</button>
 </header>
 <main>
@@ -212,9 +213,11 @@ function ago(ts) {
 }
 const FEATURES = [
   { key: 'auto_accept', label: 'Otomatik kabul (Trendyol / Getir)' },
+  { key: 'accept_button', label: 'Programdan kabul (düğme) — Trendyol / Getir', defaultOff: true, minVersion: '2.9.0' },
   { key: 'yemeksepeti', label: 'Yemeksepeti bağlantısı' },
   { key: 'print', label: 'Program fişi yazdırma' },
   { key: 'maps', label: 'Harita / yol tarifi linki' },
+  { key: 'map_link', label: 'Yol tarifinde kesin konum (enlem/boylam)', minVersion: '2.9.9' },
   { key: 'distance', label: 'Mesafe bilgisi' },
   { key: 'alerts', label: 'Sorun bildirimi (WhatsApp)' },
   { key: 'phone_orders', label: 'Telefon siparişi girişi' },
@@ -222,6 +225,7 @@ const FEATURES = [
   { key: 'courier_tracking_live', label: 'Kurye takibi: gerçek mod (kapalıysa sessiz)', defaultOff: true },
   { key: 'jettakip', label: 'JetTakip entegrasyonu (API siparişleri)', defaultOff: true },
   { key: 'migros', label: 'Migros Yemek bağlantısı (Chrome eklentisi)', defaultOff: true },
+  { key: 'trendyol_status', label: 'Trendyol / Getir "Yola çıktı / Teslim edildi" düğmeleri', defaultOff: true, minVersion: '2.9.8' },
 ];
 const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
 
@@ -293,8 +297,32 @@ async function load(force) {
 // Varsayılanı kapalı özellikler (defaultOff) sadece açıkça açıldıysa açıktır; programdaki isOn ile aynı
 const featureOn = (effective, f) => (f.defaultOff ? effective[f.key] === true : effective[f.key] !== false);
 
-function featureToggles(effective, custom, prefix) {
-  return FEATURES.map((f) => `<label class="${custom && custom[f.key] !== undefined ? 'custom' : ''}" title="${custom && custom[f.key] !== undefined ? 'Bu işletmeye özel ayar' : 'Varsayılan paketten'}">
+// Birlikte açılamayan özellikler: biri açılınca öbürü kapanır (programdan kabul ↔ otomatik kabul)
+const EXCLUSIVE = { accept_button: 'auto_accept', auto_accept: 'accept_button' };
+
+/** Özelliği açarken/kapatırken yeni özellik listesi: açılan özelliğin eşi açıksa kapatılır. */
+function withFeature(effective, current, key, on) {
+  const next = { ...(current || {}), [key]: on };
+  const partner = EXCLUSIVE[key];
+  const partnerDef = FEATURES.find((f) => f.key === partner);
+  if (on && partnerDef && featureOn({ ...(effective || {}), ...next }, partnerDef)) next[partner] = false;
+  return next;
+}
+
+/** Program bu özelliği tanıyor mu? (eski sürüm tanımadığı özelliği yok sayar; panelde gösterilmez) */
+function programSupports(i, f) {
+  if (!f.minVersion) return true;
+  const st = (i && i.status) || {};
+  if (f.key === 'accept_button' && st.accept_button_supported) return true;
+  if (f.key === 'trendyol_status' && st.trendyol_status_supported) return true;
+  if (f.key === 'map_link' && st.map_link_supported) return true;
+  return false;
+}
+
+function featureToggles(effective, custom, prefix, inst) {
+  // İşletme kartında: programın tanımadığı yeni özellik gösterilmez (açıkça açılmışsa yine görünür)
+  const list = inst ? FEATURES.filter((f) => programSupports(inst, f) || (custom && custom[f.key] !== undefined)) : FEATURES;
+  return list.map((f) => `<label class="${custom && custom[f.key] !== undefined ? 'custom' : ''}" title="${custom && custom[f.key] !== undefined ? 'Bu işletmeye özel ayar' : 'Varsayılan paketten'}">
       <span class="switch"><input type="checkbox" data-feature="${f.key}" data-scope="${prefix}" ${featureOn(effective, f) ? 'checked' : ''} /><span class="track"></span></span>
       <span class="t">${esc(f.label)}</span></label>`).join('');
 }
@@ -485,6 +513,8 @@ function settingsBlock(i) {
       ${chk('PRINT_TRENDYOL', 'Program Trendyol/Getir fişi bassın')}
       ${chk('PRINT_YEMEKSEPETI', 'Program Yemeksepeti fişi bassın')}
       ${migrosSettings(v, cur, st)}
+      ${cur && 'WATCHDOG_URL' in cur ? `<label class="full">Bekçi adresi (healthchecks.io; boş = kapalı)<input type="text" data-k="WATCHDOG_URL" value="${esc(v.WATCHDOG_URL || '')}" placeholder="https://hc-ping.com/…"/></label>` : ''}
+      ${cur && 'TRENDYOL_STATUS_DRY_RUN' in cur ? chk('TRENDYOL_STATUS_DRY_RUN', 'Trendyol "Yola çıktı / Teslim edildi" deneme modu (gerçekte göndermez)') : ''}
     </div>
     <div class="actions" style="margin-top:8px"><button class="primary" data-act="saveSettings">Kaydet ve gönder</button></div>`;
 }
@@ -507,6 +537,24 @@ function migrosSettings(v, cur, st) {
 }
 
 /** İşletme kartında Migros satırı (özellik açıksa) */
+/** Durum dosyası bozuk bulunduysa (program son 24 saati bildirir): ne olduğu ve grubun nasıl geri geldiği */
+function storageLine(st) {
+  const s = st.storage;
+  if (!s || !s.at) return '';
+  const d = new Date(s.at);
+  const p = (n) => String(n).padStart(2, '0');
+  const when = `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  let what;
+  if (s.kind === 'backup') what = 'yedekten geri yüklendi';
+  else {
+    const r = s.restored || {};
+    const how = (by) => (by === 'central' ? 'merkezdeki kayıttan geri getirildi' : by === 'code' ? 'yeniden eşleştirildi' : '<b>yeniden eşleştirilmeli (KURYEBOT-ONAY)</b>');
+    what = `${s.kind === 'missing' ? 'boş' : 'temiz'} başlandı; kurye grubu ${how(r.courier)}${r.company ? `, kurye şirketi grubu ${how(r.company)}` : ''}`;
+  }
+  const head = s.kind === 'missing' ? `Durum dosyası bulunamadı (${esc(when)})` : `Durum dosyası bozuk bulundu (${esc(when)}, ani kapanma)`;
+  return `<div class="note" data-storage>💾 ${head}: ${what}.</div>`;
+}
+
 function migrosLine(st) {
   const m = st.migros;
   if (!m) return '';
@@ -521,6 +569,37 @@ function migrosLine(st) {
   }
   const mode = m.auto_accept ? (m.dry_run ? 'kabul: kuru deneme' : 'otomatik kabul') : 'kabul: elle';
   return `<div><span>Migros Yemek</span>${text} · ${mode}</div>`;
+}
+
+// WhatsApp 10 dakikadan uzun bağlı değilse (QR bekliyor / bağlanamıyor / program açılamıyor) kartta kırmızı uyarı (2.9.8).
+// Program wa_down_since'i 2.9.8'den beri gönderir; eski sürümlerde bu uyarı çıkmaz.
+const WA_DOWN_ALERT_MS = 10 * 60 * 1000;
+function waDownMinutes(st, isOnline, now = Date.now()) {
+  if (!isOnline || !st || !st.wa_down_since) return 0;
+  const ms = now - Date.parse(st.wa_down_since);
+  return Number.isFinite(ms) && ms >= WA_DOWN_ALERT_MS ? Math.floor(ms / 60000) : 0;
+}
+function waDownLine(st, isOnline) {
+  const mins = waDownMinutes(st, isOnline);
+  if (!mins) return '';
+  const what = st.wa_down_key === 'qr' ? 'QR kodu bekliyor (oturum kapanmış)' : st.wa_down_key === 'starting' ? 'program açılamıyor' : 'bağlanamıyor';
+  const how = st.wa_down_key === 'qr' ? ' Bilgisayara RustDesk ile bağlanıp Durum penceresindeki QR kodunu işletmenin telefonundan okutun.' : '';
+  return `<div class="jt-alert" data-wa-down>🔴 <b>WhatsApp ${mins} dakikadır bağlı değil</b> — ${what}. Siparişler kurye grubuna gitmiyor.${how}</div>`;
+}
+
+/** İşletme kartında "Programdan kabul" satırı (özellik açıksa; sipariş no ve müşteri bilgisi yok) */
+function acceptLine(st) {
+  const a = st.accept_button;
+  if (!a) return '';
+  let text;
+  if (a.conflict) text = '⚠️ açılamadı: otomatik kabul de açık (birini kapatın)';
+  else if (a.unavailable) text = `⚠️ çalışmıyor: ${esc(a.unavailable)}`;
+  else if (!a.count) text = '✅ açık · onay bekleyen yok';
+  else {
+    const mins = a.oldest_at ? Math.floor((Date.now() - new Date(a.oldest_at).getTime()) / 60000) : 0;
+    text = `${mins >= 3 ? '🔴' : mins >= 1 ? '🟠' : '🔔'} onay bekleyen: ${a.count} (en eskisi ${mins} dk)${a.failed ? ` · ${a.failed} kabul edilemedi` : ''}`;
+  }
+  return `<div><span>Programdan kabul</span>${text}</div>`;
 }
 
 async function saveSettings(i, card) {
@@ -559,7 +638,7 @@ function render() {
     const st = i.status || {};
     const isOnline = i.last_seen && now - Date.parse(i.last_seen) < ONLINE_MS;
     if (isOnline) online++;
-    const color = !isOnline ? 'gray' : (st.health && st.health.color) || 'gray';
+    const color = !isOnline ? 'gray' : waDownMinutes(st, isOnline) ? 'red' : (st.health && st.health.color) || 'gray';
     if (color === 'red' || color === 'yellow' || !isOnline) problems++;
     const lastCmd = data.commands.find((c) => c.installation_id === i.id);
     const hasLog = data.logs.some((l) => l.installation_id === i.id);
@@ -584,15 +663,18 @@ function render() {
         <div><span>Sürüm</span>${esc(i.version || '-')}${st.ext_version ? ' · eklenti ' + esc(st.ext_version) : ''}${st.update_downloaded ? ' · ' + esc(st.update_downloaded) + ' indirildi' : ''}</div>
         <div><span>WhatsApp</span>${st.wa_number ? '+' + esc(st.wa_number) : '-'}</div>
         ${migrosLine(st)}
+        ${acceptLine(st)}
       </div>
+      ${waDownLine(st, isOnline)}
       ${setupProgressBlock(i)}
+      ${storageLine(st)}
       ${jettakipBlock(i)}
       ${courierBlock(st.courier)}
       <details class="pkg settings"><summary>Ayarlar${(i.settings_override || {})._rev && (i.settings_override || {})._rev !== (i.status || {}).settings_applied_rev ? ' (⏳ gönderim bekliyor)' : ''}</summary>
         ${settingsBlock(i)}
       </details>
       <details class="pkg"><summary>Paket özellikleri${Object.keys(i.features || {}).length ? ' (işletmeye özel ayar var •)' : ''}</summary>
-        <div class="features">${featureToggles({ ...(data.featureDefaults || {}), ...(i.features || {}) }, i.features || {}, 'inst')}</div>
+        <div class="features">${featureToggles({ ...(data.featureDefaults || {}), ...(i.features || {}) }, i.features || {}, 'inst', i)}</div>
         ${Object.keys(i.features || {}).length ? '<p class="muted" style="margin:6px 0 0"><a href="#" data-act="resetFeatures">Varsayılan pakete döndür</a></p>' : ''}
       </details>
       <label class="small-switch"><span class="switch"><input type="checkbox" data-act="update" ${i.update_allowed ? 'checked' : ''} /><span class="track"></span></span> Yeni sürümleri alsın ${i.update_allowed ? '(açık)' : '(kapalı)'}</label>
@@ -705,6 +787,14 @@ data.lastCodes = {}; // üretilen kodlar sadece bu sayfa açıkken gösterilir (
 function drawNewFeatures(custom) {
   const eff = { ...(data.featureDefaults || {}), ...(custom || {}) };
   $('nFeatures').innerHTML = featureToggles(eff, custom || {}, 'new');
+  // Birlikte açılamayanlar: biri işaretlenince öbürü kaldırılır
+  $('nFeatures').querySelectorAll('input[data-feature]').forEach((el) => {
+    el.addEventListener('change', () => {
+      const partner = EXCLUSIVE[el.dataset.feature];
+      const other = partner && $('nFeatures').querySelector(`input[data-feature="${partner}"]`);
+      if (el.checked && other && other.checked) other.checked = false;
+    });
+  });
   newFeaturesDrawn = true;
 }
 
@@ -975,10 +1065,19 @@ async function toggleInstallation(i, enabled, el) {
   load();
 }
 
+/** Açılan özellik yüzünden kapanacak eşi varsa onay mesajına eklenecek satır */
+function exclusiveNote(before, after, key) {
+  const partner = EXCLUSIVE[key];
+  if (!partner || before[partner] === after[partner] || after[partner] !== false) return '';
+  const pl = (FEATURES.find((f) => f.key === partner) || {}).label || partner;
+  return `\n\n"${pl}" KAPANACAK (ikisi birlikte açılamaz).`;
+}
+
 async function setInstFeature(i, key, on, el) {
   const label = (FEATURES.find((f) => f.key === key) || {}).label || key;
-  if (!confirm(`${i.business_name}: "${label}" ${on ? 'AÇILSIN' : 'KAPATILSIN'} mı?\n\nProgram 1 dakika içinde yeni paketle kendini yeniden başlatır.`)) { el.checked = !on; return; }
-  const features = { ...(i.features || {}), [key]: on };
+  const features = withFeature(data.featureDefaults || {}, i.features || {}, key, on);
+  const note = exclusiveNote(i.features || {}, features, key);
+  if (!confirm(`${i.business_name}: "${label}" ${on ? 'AÇILSIN' : 'KAPATILSIN'} mı?${note}\n\nProgram 1 dakika içinde yeni paketle kendini yeniden başlatır.`)) { el.checked = !on; return; }
   const { error } = await db.from('installations').update({ features }).eq('id', i.id);
   if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !on; }
   load();
@@ -986,8 +1085,9 @@ async function setInstFeature(i, key, on, el) {
 
 async function setDefaultFeature(key, on, el) {
   const label = (FEATURES.find((f) => f.key === key) || {}).label || key;
-  if (!confirm(`Varsayılan pakette "${label}" ${on ? 'AÇILSIN' : 'KAPATILSIN'} mı?\n\nBu özellik için işletmeye özel ayar yapılmamış TÜM işletmeler etkilenir.`)) { el.checked = !on; return; }
-  const next = { ...(data.featureDefaults || {}), [key]: on };
+  const next = withFeature({}, data.featureDefaults || {}, key, on);
+  const note = exclusiveNote(data.featureDefaults || {}, next, key);
+  if (!confirm(`Varsayılan pakette "${label}" ${on ? 'AÇILSIN' : 'KAPATILSIN'} mı?${note}\n\nBu özellik için işletmeye özel ayar yapılmamış TÜM işletmeler etkilenir.`)) { el.checked = !on; return; }
   const { error } = await db.from('settings').update({ value: next }).eq('key', 'feature_defaults');
   if (error) { alert('Kaydedilemedi: ' + error.message); el.checked = !on; }
   load();
