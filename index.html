@@ -151,11 +151,16 @@
     </section>
     <section id="reportView" class="card hidden">
       <div class="row">
-        <div class="grow"><b>Aylık sipariş sayıları</b><div class="muted">Programların bildirdiği teslimatlar. Müşteri bilgisi tutulmaz.</div></div>
+        <div class="grow"><b id="repTitle">Aylık sipariş sayıları</b><div class="muted">Programların bildirdiği teslimatlar. Müşteri bilgisi tutulmaz. Gün gün döküm için işletmeye tıklayın.</div></div>
+        <select id="repView" style="font:inherit;padding:9px 8px;border:1px solid var(--line);border-radius:8px;background:#fff" aria-label="Görünüm"><option value="month">Aylık</option><option value="week">Haftalık</option><option value="day">Günlük</option></select>
         <input id="month" type="month" style="width:auto;margin:0" />
+        <span id="repNav" class="hidden" style="white-space:nowrap"><button id="repPrev" title="Önceki">◀</button> <span id="repRange"></span> <button id="repNext" title="Sonraki">▶</button></span>
+        <input id="repDay" type="date" class="hidden" style="width:auto;margin:0" />
         <button id="btnCsv">Excel'e aktar (CSV)</button>
       </div>
       <div class="scroll" style="margin-top:10px"><table class="report" id="reportTable"></table></div>
+      <div id="reportNote" class="muted hidden" style="margin-top:8px"></div>
+      <div id="reportDetail" class="hidden" style="margin-top:14px"></div>
     </section>
     <div id="instView">
     <div class="card">
@@ -1105,17 +1110,84 @@ async function toggleUpdate(i, allowed, el) {
 
 // ------------------------------------------------------------------ sipariş sayıları
 let reportRows = [];
+let repView = 'month'; // 'month' | 'week' (Pazartesi–Pazar) | 'day'
+let repAnchor = ''; // haftalık / günlük görünümün tarihi (YYYY-MM-DD, yerel)
+let repDetailId = null; // gün gün dökümü açık olan işletme
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseYmd = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+const weekStart = (s) => { const d = parseYmd(s); return addDays(s, -((d.getDay() + 6) % 7)); }; // Pazartesi
+const trDate = (s, opts) => parseYmd(s).toLocaleDateString('tr-TR', opts);
 function monthRange(v) {
   const [y, m] = v.split('-').map(Number);
   const start = `${y}-${String(m).padStart(2, '0')}-01`;
   const endDate = new Date(y, m, 0).getDate();
   return { start, end: `${y}-${String(m).padStart(2, '0')}-${String(endDate).padStart(2, '0')}` };
 }
+/** Seçili görünümün tarih aralığı, başlığı ve CSV dosya adı eki. */
+function reportRange() {
+  if (repView === 'week') {
+    const start = weekStart(repAnchor), end = addDays(start, 6);
+    const label = `${trDate(start, { day: 'numeric', month: 'long' })} – ${trDate(end, { day: 'numeric', month: 'long', year: 'numeric' })}`;
+    return { start, end, label, title: 'Haftalık sipariş sayıları', file: `hafta-${start}` };
+  }
+  if (repView === 'day') {
+    return { start: repAnchor, end: repAnchor, label: trDate(repAnchor, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), title: 'Günlük sipariş sayıları', file: `gun-${repAnchor}` };
+  }
+  return { ...monthRange($('month').value), label: '', title: 'Aylık sipariş sayıları', file: $('month').value };
+}
+function syncReportControls() {
+  const r = reportRange();
+  $('repTitle').textContent = r.title;
+  $('month').classList.toggle('hidden', repView !== 'month');
+  $('repNav').classList.toggle('hidden', repView === 'month');
+  $('repDay').classList.toggle('hidden', repView !== 'day');
+  $('repRange').textContent = repView === 'week' ? r.label : '';
+  if (repView === 'day') $('repDay').value = repAnchor;
+}
+function setReportView(v) {
+  if (v !== 'month' && (repView === 'month' || !repAnchor)) {
+    // aylıktan geçince seçili ayın içinden başla (bu aysa bugün)
+    const today = ymd(new Date());
+    repAnchor = today.slice(0, 7) === $('month').value ? today : `${$('month').value}-01`;
+  } else if (v === 'day' && repView === 'week') {
+    // haftalıktan günlüğe: bugün o haftadaysa bugün, değilse haftanın Pazartesi'si
+    const today = ymd(new Date()), ws = weekStart(repAnchor);
+    repAnchor = today >= ws && today <= addDays(ws, 6) ? today : ws;
+  }
+  if (v === 'month' && repAnchor) $('month').value = repAnchor.slice(0, 7);
+  repView = v;
+  $('repView').value = v;
+  loadReport();
+}
+function stepReport(dir) {
+  repAnchor = addDays(repAnchor, dir * (repView === 'week' ? 7 : 1));
+  loadReport();
+}
+/** "2 saattir", "15 dakikadır", "3 gündür" */
+function silentFor(ts) {
+  const m = Math.max(1, Math.floor((Date.now() - Date.parse(ts)) / 60000));
+  if (m < 60) return `${m} dakikadır`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h} saattir` : `${Math.floor(h / 24)} gündür`;
+}
+/** Tablo programların her dakikaki bildirimiyle güncel; sadece haber vermeyen (arşivde olmayan) işletmelerin son siparişleri eksik olabilir. */
+function renderReportNote() {
+  const items = data.installations
+    .filter((i) => !isArchived(i) && i.last_seen && !instOnline(i))
+    .sort((a, b) => plainName(a).localeCompare(plainName(b), 'tr'))
+    .map((i) => `⚠️ <b>${esc(plainName(i))}</b>: program ${silentFor(i.last_seen)} haber vermiyor, bu süredeki siparişler tabloda yok.`);
+  $('reportNote').classList.toggle('hidden', !items.length);
+  $('reportNote').innerHTML = items.join('<br>');
+}
 async function loadReport() {
-  const { start, end } = monthRange($('month').value);
+  syncReportControls();
+  renderReportNote();
+  const { start, end } = reportRange();
   const { data: rows, error } = await db.from('orders_daily').select('*').gte('day', start).lte('day', end).order('day', { ascending: true });
   if (error) { $('reportTable').innerHTML = `<tr><td>Yüklenemedi: ${esc(error.message)}</td></tr>`; return; }
   reportRows = rows || [];
+  if (repDetailId) loadReportDetail(repDetailId);
   const names = Object.fromEntries(data.installations.map((i) => [i.id, i.business_name || 'İsimsiz']));
   const platforms = new Set();
   const byInst = {};
@@ -1128,15 +1200,58 @@ async function loadReport() {
   }
   const plats = [...platforms].sort();
   const ids = Object.keys(byInst).sort((a, b) => (names[a] || '').localeCompare(names[b] || '', 'tr'));
-  if (!ids.length) { $('reportTable').innerHTML = '<tr><td class="muted">Bu ay için kayıt yok.</td></tr>'; return; }
-  let html = `<tr><th>İşletme</th><th class="num">Toplam</th>${plats.map((p) => `<th class="num">${esc(p)}</th>`).join('')}<th class="num">Km (kuş uçuşu)</th><th class="num">Sipariş olan gün</th></tr>`;
+  const emptyText = { month: 'Bu ay için kayıt yok.', week: 'Bu hafta için kayıt yok.', day: 'Bu gün için kayıt yok.' }[repView];
+  if (!ids.length) { $('reportTable').innerHTML = `<tr><td class="muted">${emptyText}</td></tr>`; return; }
+  const showDays = repView !== 'day';
+  const kmText = (km) => (km ? km.toLocaleString('tr-TR', { maximumFractionDigits: 1 }) : '-');
+  let html = `<tr><th>İşletme</th><th class="num">Toplam</th>${plats.map((p) => `<th class="num">${esc(p)}</th>`).join('')}<th class="num">Km (kuş uçuşu)</th>${showDays ? '<th class="num">Sipariş olan gün</th>' : ''}</tr>`;
   let grand = 0;
   for (const id of ids) {
     const b = byInst[id]; grand += b.total;
-    html += `<tr><td>${esc(names[id] || 'Silinmiş kurulum')}</td><td class="num"><b>${b.total}</b></td>${plats.map((p) => `<td class="num">${b.by[p] || 0}</td>`).join('')}<td class="num">${b.km ? b.km.toLocaleString('tr-TR', { maximumFractionDigits: 1 }) : '-'}</td><td class="num">${b.days}</td></tr>`;
+    const open = id === repDetailId ? ' style="background:#f6f8fa"' : '';
+    html += `<tr class="repRow" data-id="${esc(id)}" title="Gün gün döküm" style="cursor:pointer"${open}><td><u>${esc(names[id] || 'Silinmiş kurulum')}</u></td><td class="num"><b>${b.total}</b></td>${plats.map((p) => `<td class="num">${b.by[p] || 0}</td>`).join('')}<td class="num">${kmText(b.km)}</td>${showDays ? `<td class="num">${b.days}</td>` : ''}</tr>`;
   }
-  html += `<tr><td><b>Toplam</b></td><td class="num"><b>${grand}</b></td>${plats.map(() => '<td></td>').join('')}<td></td><td></td></tr>`;
+  html += `<tr><td><b>Toplam</b></td><td class="num"><b>${grand}</b></td>${plats.map(() => '<td></td>').join('')}<td></td>${showDays ? '<td></td>' : ''}</tr>`;
   $('reportTable').innerHTML = html;
+  for (const tr of $('reportTable').querySelectorAll('tr.repRow')) {
+    tr.onclick = () => {
+      repDetailId = repDetailId === tr.dataset.id ? null : tr.dataset.id;
+      if (!repDetailId) { $('reportDetail').classList.add('hidden'); $('reportDetail').innerHTML = ''; }
+      loadReport();
+    };
+  }
+}
+/** Tıklanan işletmenin, seçili görünümün ayındaki gün gün dökümü (sadece okuma). */
+async function loadReportDetail(id) {
+  const month = repView === 'month' ? $('month').value : reportRange().start.slice(0, 7);
+  const { start, end } = monthRange(month);
+  const { data: rows, error } = await db.from('orders_daily').select('*').eq('installation_id', id).gte('day', start).lte('day', end).order('day', { ascending: true });
+  if (id !== repDetailId) return; // bu arada başka işletme seçildi
+  const box = $('reportDetail');
+  box.classList.remove('hidden');
+  const inst = data.installations.find((i) => i.id === id);
+  const name = inst ? plainName(inst) : 'Silinmiş kurulum';
+  const head = `<div class="row"><b class="grow">${esc(name)} — ${esc(trDate(start, { month: 'long', year: 'numeric' }))} gün gün</b><button id="repDetailClose">Kapat</button></div>`;
+  if (error) { box.innerHTML = head + `<div class="muted">Yüklenemedi: ${esc(error.message)}</div>`; }
+  else {
+    const byDay = Object.fromEntries((rows || []).filter((r) => r.day >= start && r.day <= end).map((r) => [r.day, r]));
+    const plats = [...new Set(Object.values(byDay).flatMap((r) => Object.keys(r.by_platform || {})))].sort();
+    // ayın bütün günleri (bu aysa bugüne kadar); kaydı olmayan gün 0
+    const today = ymd(new Date());
+    const last = end < today ? end : today;
+    const days = [];
+    for (let d = start; d <= last; d = addDays(d, 1)) days.push(d);
+    let total = 0;
+    let html = `<tr><th>Tarih</th><th class="num">Toplam</th>${plats.map((p) => `<th class="num">${esc(p)}</th>`).join('')}</tr>`;
+    for (const d of days) {
+      const r = byDay[d] || { total: 0, by_platform: {} };
+      total += r.total;
+      html += `<tr${r.total ? '' : ' class="muted"'}><td>${esc(trDate(d, { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'short' }))}</td><td class="num"><b>${r.total}</b></td>${plats.map((p) => `<td class="num">${(r.by_platform || {})[p] || 0}</td>`).join('')}</tr>`;
+    }
+    html += `<tr><td><b>Toplam</b></td><td class="num"><b>${total}</b></td>${plats.map((p) => `<td class="num">${days.reduce((s, d) => s + (((byDay[d] || {}).by_platform || {})[p] || 0), 0)}</td>`).join('')}</tr>`;
+    box.innerHTML = head + (days.length ? `<div class="scroll"><table class="report" id="reportDetailTable">${html}</table></div>` : '<div class="muted">Bu ay henüz başlamadı.</div>');
+  }
+  $('repDetailClose').onclick = () => { repDetailId = null; box.classList.add('hidden'); box.innerHTML = ''; loadReport(); };
 }
 function downloadCsv() {
   const names = Object.fromEntries(data.installations.map((i) => [i.id, i.business_name || 'İsimsiz']));
@@ -1146,7 +1261,7 @@ function downloadCsv() {
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `kurye-botu-siparisler-${$('month').value}.csv`;
+  a.download = `kurye-botu-siparisler-${reportRange().file}.csv`;
   a.click();
 }
 function showTab(which) {
@@ -1281,8 +1396,12 @@ $('tabSetup').onclick = () => showTab('setup');
 $('nSource').onchange = syncNewSource;
 $('btnCreateSetup').onclick = createSetup;
 $('btnCancelEdit').onclick = () => { resetNewForm(); $('newMsg').classList.add('hidden'); };
-$('month').value = new Date().toISOString().slice(0, 7);
-$('month').onchange = loadReport;
+$('month').value = ymd(new Date()).slice(0, 7);
+$('month').onchange = () => { repDetailId = null; $('reportDetail').classList.add('hidden'); loadReport(); };
+$('repView').onchange = () => setReportView($('repView').value);
+$('repPrev').onclick = () => stepReport(-1);
+$('repNext').onclick = () => stepReport(1);
+$('repDay').onchange = () => { if ($('repDay').value) { repAnchor = $('repDay').value; loadReport(); } };
 $('btnCsv').onclick = downloadCsv;
 start();
 </script>
