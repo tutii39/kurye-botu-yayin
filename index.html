@@ -10,6 +10,8 @@
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, "Segoe UI", Roboto, Arial, sans-serif; padding: env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0); }
   header { position: sticky; top: 0; z-index: 5; background: #24292f; color: #fff; padding: 12px 16px; display:flex; align-items:center; gap:10px; }
+  /* 05.11: kaydırılarak gelinen öğe (düğme, form) yapışkan başlığın (~62 px) altında kalmasın */
+  html { scroll-padding-top: 80px; }
   header h1 { font-size: 17px; margin: 0; flex: 1; display: flex; align-items: center; gap: 8px; }
   header h1 .brandlogo svg { width: 24px; height: 24px; display: block; }
   header button { background: transparent; color: #fff; border: 1px solid #57606a; }
@@ -232,7 +234,7 @@ const FEATURES = [
   { key: 'migros', label: 'Migros Yemek bağlantısı (Chrome eklentisi)', defaultOff: true },
   { key: 'trendyol_status', label: 'Trendyol / Getir "Yola çıktı / Teslim edildi" düğmeleri', defaultOff: true, minVersion: '2.9.8' },
 ];
-const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle' };
+const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle', wa_reset: "WhatsApp'ı sıfırla (QR göster)" };
 
 // ------------------------------------------------------------------ giriş
 async function login() {
@@ -266,16 +268,20 @@ async function logout() {
 
 // ------------------------------------------------------------------ veri
 async function load(force) {
-  const [inst, g, cmds, logs, jt, codes] = await Promise.all([
+  // Merkez bekçi (05.11) listesi de aynı anda okunur (ayrı bir bekleme yenilemeyi uzatıyordu)
+  const [inst, g, cmds, logs, jt, codes, bk] = await Promise.all([
     db.from('installations').select('*').order('business_name', { ascending: true }),
     db.from('settings').select('*'),
     db.from('commands').select('*').order('created_at', { ascending: false }).limit(300),
     db.from('logs').select('id, installation_id, created_at').order('created_at', { ascending: false }).limit(300),
     db.rpc('jettakip_admin_overview'),
     db.from('setup_codes').select('installation_id, created_at, expires_at, used_at, cancelled_at').order('created_at', { ascending: false }).limit(300),
+    db.rpc('admin_bekci_liste'),
   ]);
   // JetTakip SQL'i (2.7) çalıştırılmamışsa bölüm gizli kalır
   data.jt = jt && !jt.error && jt.data ? jt.data : null;
+  // Merkez bekçi (05.11): SQL çalıştırılmamışsa bölüm görünmez
+  data.bekci = bk && !bk.error && Array.isArray(bk.data) ? Object.fromEntries(bk.data.map((x) => [x.installation_id, x])) : null;
   // Kurulum kodu SQL'i (2.8) çalıştırılmamışsa "Yeni kurulum" sekmesi uyarı gösterir
   data.setupReady = Boolean(codes && !codes.error);
   data.setupCodes = (codes && codes.data) || [];
@@ -576,6 +582,66 @@ function migrosLine(st) {
   return `<div><span>Migros Yemek</span>${text} · ${mode}</div>`;
 }
 
+// ---- Merkez bekçi (05.11; admin_bekci_liste / admin_bekci_kaydet; docs/MERKEZ-BEKCI-PLANI.md) ----------------------
+// Merkez dakikada bir bakar: çalışma saatinde program 10 dk sessiz ya da WhatsApp 10 dk bağlı değilse healthchecks.io'ya
+// ping gitmez, healthchecks uyarır. Ping adresi Vault'ta (panel sadece "var / yok" görür).
+const GUNLER = [['1', 'Pazartesi'], ['2', 'Salı'], ['3', 'Çarşamba'], ['4', 'Perşembe'], ['5', 'Cuma'], ['6', 'Cumartesi'], ['7', 'Pazar']];
+const BEKCI_VARSAYILAN = Object.fromEntries(GUNLER.map(([g]) => [g, ['11:00', '23:00']]));
+const saatDk = (t) => (t ? new Date(t).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '');
+function bekciDurumu(b) {
+  if (!b || !b.aktif) return { renk: 'gri', metin: 'kapalı' };
+  if (!b.ping_adresi_var) return { renk: 'turuncu', metin: "açık ama ping adresi yok (Vault'a ekleyin)" };
+  if (!b.son_kontrol) return { renk: 'gri', metin: 'açık, ilk kontrol bekleniyor' };
+  if (b.saglikli === false) return { renk: 'kirmizi', metin: `sorun: ${b.sebep || '?'}${b.sorun_baslangic ? ` (${saatDk(b.sorun_baslangic)}'den beri)` : ''} — healthchecks uyarır` };
+  if (b.mesai === false) return { renk: 'gri', metin: `çalışma saati dışında (uyarı yok)${b.son_ping ? ` · son ping ${saatDk(b.son_ping)}` : ''}` };
+  return { renk: 'yesil', metin: `sağlıklı${b.son_ping ? ` · son ping ${saatDk(b.son_ping)}` : ''}` };
+}
+function bekciLine(i) {
+  if (!data.bekci) return '';
+  const d = bekciDurumu(data.bekci[i.id]);
+  const ik = { yesil: '🟢', kirmizi: '🔴', turuncu: '🟠', gri: '⚪' }[d.renk];
+  return `<div class="muted" data-bekci-satir style="margin:4px 0">${ik} <b>Bekçi:</b> ${esc(d.metin)}</div>`;
+}
+function bekciBlock(i) {
+  if (!data.bekci) return '';
+  const b = data.bekci[i.id] || {};
+  const h = b.saatler || BEKCI_VARSAYILAN;
+  const satir = ([g, ad]) => {
+    const a = h[g];
+    return `<div class="row" data-bekci-gun="${g}" style="gap:8px;align-items:center;margin:2px 0"><span style="width:90px">${ad}</span>
+      <label class="chk"><input type="checkbox" name="kapali" ${a ? '' : 'checked'} /> kapalı</label>
+      <input type="time" name="acilis" value="${esc(a ? a[0] : '11:00')}" /> – <input type="time" name="kapanis" value="${esc(a ? a[1] : '23:00')}" /></div>`;
+  };
+  return `<details class="pkg settings" data-bekci-form="${esc(i.id)}"><summary>Bekçi ve çalışma saatleri${b.aktif ? ' (açık)' : ' (kapalı)'}</summary>
+    <label class="chk" style="margin:6px 0"><input type="checkbox" name="aktif" ${b.aktif ? 'checked' : ''} /> Bekçi açık (çalışma saatinde sorun olursa healthchecks.io uyarır)</label>
+    ${GUNLER.map(satir).join('')}
+    <p class="muted" style="margin:4px 0">Kapanış açılıştan erkense gece yarısını geçer (ör. 11:00 – 02:00). Ping adresi: ${b.ping_adresi_var ? 'var ✓' : `yok — Vault'a <code>bekci_ping_${esc(i.id)}</code> adıyla ekleyin`}.</p>
+    <button data-act="bekciKaydet">Kaydet</button></details>`;
+}
+/** Formu okur: { aktif, saatler } ya da hata (Türkçe) */
+function bekciOku(kap) {
+  const saatler = {};
+  for (const [g, ad] of GUNLER) {
+    const row = kap.querySelector(`[data-bekci-gun="${g}"]`);
+    if (row.querySelector('[name="kapali"]').checked) { saatler[g] = null; continue; }
+    const a = row.querySelector('[name="acilis"]').value, k = row.querySelector('[name="kapanis"]').value;
+    if (!/^\d\d:\d\d$/.test(a) || !/^\d\d:\d\d$/.test(k)) throw new Error(`${ad}: açılış ve kapanış saatini girin (ya da "kapalı" işaretleyin).`);
+    saatler[g] = [a, k];
+  }
+  return { aktif: kap.querySelector('[name="aktif"]').checked, saatler };
+}
+async function bekciKaydet(i) {
+  const kap = document.querySelector(`[data-bekci-form="${CSS.escape(i.id)}"]`);
+  if (!kap) return;
+  let v;
+  try { v = bekciOku(kap); } catch (x) { return alert(x.message); }
+  const { data: r, error } = await db.rpc('admin_bekci_kaydet', { p_installation: i.id, p_aktif: v.aktif, p_saatler: v.saatler });
+  if (error) return alert('Kaydedilemedi: ' + error.message);
+  if (r && r.sonuc === 'gecersiz_saat') return alert('Saat biçimi geçersiz.');
+  kap.open = false;
+  return load(true);
+}
+
 // WhatsApp 10 dakikadan uzun bağlı değilse (QR bekliyor / bağlanamıyor / program açılamıyor) kartta kırmızı uyarı (2.9.8).
 // Program wa_down_since'i 2.9.8'den beri gönderir; eski sürümlerde bu uyarı çıkmaz.
 const WA_DOWN_ALERT_MS = 10 * 60 * 1000;
@@ -677,10 +743,12 @@ function render() {
         ${acceptLine(st)}
       </div>
       ${waDownLine(st, isOnline)}
+      ${bekciLine(i)}
       ${setupProgressBlock(i)}
       ${storageLine(st)}
       ${jettakipBlock(i)}
       ${courierBlock(st.courier)}
+      ${bekciBlock(i)}
       <details class="pkg settings"><summary>Ayarlar${(i.settings_override || {})._rev && (i.settings_override || {})._rev !== (i.status || {}).settings_applied_rev ? ' (⏳ gönderim bekliyor)' : ''}</summary>
         ${settingsBlock(i)}
       </details>
@@ -696,6 +764,7 @@ function render() {
         <button data-act="cmd" data-type="upload_logs">Kayıt iste</button>
         <button data-act="logs" ${hasLog ? '' : 'disabled'}>Kayıtları gör</button>
         <button data-act="cmd" data-type="update_now">Şimdi güncelle</button>
+        <button data-act="cmd" data-type="wa_reset" title="Program 2.9.12 ve sonrası">WhatsApp'ı sıfırla (QR göster)</button>
         <button data-act="note">Not</button>
         <button data-act="archive">Arşivle</button>
       </div>`;
@@ -1295,6 +1364,8 @@ async function action(i, act, type) {
   if (act === 'cmd') {
     if (type === 'update_now' && !confirm(`${i.business_name}: yeni sürüm varsa şimdi kurulsun mu? Program kısa süreliğine kapanıp açılır.`)) return;
     if (type === 'restart' && !confirm(`${i.business_name}: program yeniden başlatılsın mı?`)) return;
+    // 05.11 (2.9.12): uzaktan WhatsApp sıfırlama: oturum yedeğe alınır (silinmez), program yeni QR gösterir
+    if (type === 'wa_reset' && !confirm(`${i.business_name}: WhatsApp oturumu sıfırlansın mı?\n\nEski oturum yedeğe alınır (silinmez), program yeni QR kodu gösterir. QR'ın işletmenin telefonundan okutulması gerekir; okutulana kadar siparişler kurye grubuna gitmez.\n(Program 2.9.12 ve sonrası; eski sürümler "Bilinmeyen komut" der.)`)) return;
     const { error } = await db.from('commands').insert({ installation_id: i.id, type });
     if (error) alert('Komut gönderilemedi: ' + error.message);
     return load();
@@ -1320,6 +1391,7 @@ async function action(i, act, type) {
     return load();
   }
   if (act === 'archive') return archiveInstallation(i);
+  if (act === 'bekciKaydet') return bekciKaydet(i);
   if (act === 'unarchive') {
     const { error } = await db.from('installations').update({ archived_at: null }).eq('id', i.id);
     if (error) alert('Geri alınamadı: ' + error.message);
