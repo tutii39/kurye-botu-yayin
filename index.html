@@ -585,6 +585,12 @@ function waDownMinutes(st, isOnline, now = Date.now()) {
   return Number.isFinite(ms) && ms >= WA_DOWN_ALERT_MS ? Math.floor(ms / 60000) : 0;
 }
 function waDownLine(st, isOnline) {
+  // 2.9.11: oturum telefondan düştü (program wa_logged_out gönderir): 10 dk beklemeden kırmızı uyarı
+  if (isOnline && st && st.wa_logged_out) {
+    const t = st.wa_logged_out.since ? new Date(st.wa_logged_out.since) : null;
+    const saat = t && !isNaN(t) ? ` (${t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'den beri)` : '';
+    return `<div class="jt-alert" data-wa-down data-wa-logged-out>🔴 <b>WhatsApp oturumu düştü — QR ile yeniden bağlayın</b>${saat}. Siparişler kurye grubuna gitmiyor. Bilgisayara RustDesk ile bağlanıp Durum penceresindeki QR kodunu işletmenin telefonundan okutun (WhatsApp &gt; Bağlı Cihazlar &gt; Cihaz Bağla).</div>`;
+  }
   const mins = waDownMinutes(st, isOnline);
   if (!mins) return '';
   const what = st.wa_down_key === 'qr' ? 'QR kodu bekliyor (oturum kapanmış)' : st.wa_down_key === 'starting' ? 'program açılamıyor' : 'bağlanamıyor';
