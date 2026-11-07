@@ -4,6 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>JetTakip — Yönetim Paneli</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="ikon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="JetTakip" />
+<meta name="theme-color" content="#24292f" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%3E%20%3Crect%20width%3D%221024%22%20height%3D%221024%22%20rx%3D%22200%22%20fill%3D%22%230B62D6%22%2F%3E%20%3Cg%20transform%3D%22translate(512%20512)%20skewX(-10)%20translate(-512%20-512)%22%20fill%3D%22%23FFFFFF%22%3E%20%3Crect%20x%3D%22200%22%20y%3D%22230%22%20width%3D%22680%22%20height%3D%22170%22%20rx%3D%2224%22%2F%3E%20%3Crect%20x%3D%22610%22%20y%3D%22260%22%20width%3D%22170%22%20height%3D%22560%22%20rx%3D%2224%22%2F%3E%20%3Cpath%20d%3D%22M%20290%20260%20H%20460%20V%20640%20A%20190%20190%200%200%201%2080%20640%20V%20610%20H%20250%20V%20640%20A%2020%2020%200%200%200%20290%20640%20Z%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E" />
 <style>
   :root { --bg:#f4f5f7; --card:#fff; --text:#1f2328; --muted:#57606a; --line:#d0d7de; --green:#1f883d; --yellow:#bf8700; --red:#cf222e; --gray:#6e7781; --blue:#0969da; }
@@ -23,6 +28,13 @@
   button:disabled { opacity: .5; }
   input { font: inherit; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin: 4px 0 10px; }
   .row { display:flex; align-items:center; gap:10px; flex-wrap: wrap; }
+  /* 06.11: bekçi çalışma saatleri: her gün tek satır (genel "input { width:100% }" kuralı burada geçersiz) */
+  .bekci-gun { display:grid; grid-template-columns: minmax(64px, 88px) auto minmax(0, 104px) auto minmax(0, 104px); gap:6px; align-items:center; margin:2px 0; }
+  .bekci-gun .gun { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bekci-gun .kapali { display:flex; align-items:center; gap:4px; white-space: nowrap; font-size: 13px; }
+  .bekci-gun input[type=checkbox] { width: 16px; height: 16px; margin: 0; }
+  .bekci-gun input[type=time] { width: 100%; min-width: 0; margin: 0; padding: 6px 4px; }
+  @media (max-width: 420px) { .bekci-gun { grid-template-columns: 56px auto minmax(0, 1fr) auto minmax(0, 1fr); gap:4px; font-size: 13px; } }
   .grow { flex: 1; min-width: 0; }
   .muted { color: var(--muted); font-size: 13px; }
   .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; display:inline-block; }
@@ -91,6 +103,47 @@
   .architem { border-top: 1px solid var(--line); padding: 10px 0; }
   .architem:first-child { border-top: none; }
   .architem .actions { margin-top: 6px; }
+  /* Kuryeler (ortak defter) */
+  .ky-uyari { background:#ffebe9; color:#82071e; border:2px solid #cf222e; border-radius:10px; padding:10px 12px; margin: 0 0 10px; font-size:14px; }
+  .ky-uyari-dugmeler { display:inline-flex; gap:6px; margin-left:6px; vertical-align: middle; }
+  .ky-rozet { display:inline-block; min-width:18px; padding:0 5px; margin-left:4px; border-radius:999px; background: var(--red); color:#fff; font-size:12px; font-weight:700; text-align:center; }
+  .ky-alt { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin: 0 0 10px; }
+  .ky-alt button.active { background: var(--blue); color:#fff; border-color: var(--blue); }
+  .ky-sag { margin-left:auto; }
+  .ky-ozet { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:12px; }
+  .ky-kutu { background: var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+  .ky-kutu b { display:block; font-size:22px; } .ky-kutu span { color: var(--muted); font-size:12px; }
+  .ky-kutu.uyari { border-color: var(--red); background:#ffebe9; } .ky-kutu.uyari b { color: var(--red); }
+  table.ky-tablo td { vertical-align: top; } table.ky-tablo td .actions { flex-wrap: nowrap; }
+  .ky-sutunlar { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; margin: 10px 0 14px; }
+  @media (max-width: 900px) { .ky-sutunlar { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 520px) { .ky-sutunlar { grid-template-columns: 1fr; } }
+  .ky-sutun { background: var(--card); border:1px solid var(--line); border-radius:10px; padding:8px; min-width:0; }
+  .ky-sutun h4 { margin:0 0 6px; font-size:14px; display:flex; justify-content:space-between; }
+  .ky-sutun.sorunlu { border-color: var(--red); } .ky-sutun.sorunlu h4 { color: var(--red); }
+  .ky-skart { border:1px solid var(--line); border-radius:8px; padding:6px 8px; margin:6px 0; font-size:13px; }
+  .ky-skart b { font-size:14px; } .ky-skart .ky-sorun { color: var(--red); font-weight:700; }
+  .ky-skart button { margin-top:4px; }
+  .ky-skart, #kyTabloSiparis tbody tr { cursor:pointer; } .ky-skart:hover { border-color: var(--muted); }
+  .ky-alt-satir { display:block; color: var(--muted); font-size:12px; }
+  tr.ky-satir-uyari td { background:#ffebe9; } tr.ky-soluk td { color: var(--muted); }
+  .ky-rozet-d { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .ky-rozet-d.yesil { background:#dafbe1; color:#116329; } .ky-rozet-d.turuncu { background:#fff8c5; color:#7d4e00; }
+  .ky-rozet-d.kirmizi { background:#ffebe9; color:#a40e26; } .ky-rozet-d.mavi { background:#ddf4ff; color: var(--blue); } .ky-rozet-d.gri { background:#eaeef2; color: var(--muted); }
+  .ky-fis { display:flex; flex-direction:column; gap:6px; margin-top:8px; } .ky-fis img { max-width:100%; max-height:260px; object-fit:contain; border:1px solid var(--line, #ddd); border-radius:8px; cursor:zoom-in; }
+  .ky-fis img.buyuk { max-height:none; cursor:zoom-out; }
+  .ky-kirmizi-yazi { color: var(--red); font-weight:600; } .ky-turuncu-yazi { color: #9a5b00; } .ky-eksi { color: var(--red); } .ky-arti { color: var(--green); }
+  .ky-chk, #kyPencere .chk, #kyAyarForm .chk { display:flex; align-items:center; gap:8px; font-size:14px; }
+  .ky-chk input, #kyPencere .chk input, #kyAyarForm .chk input { width:18px; height:18px; margin:0; }
+  .ky-adim { border-top:1px solid var(--line); padding:10px 0; } .ky-adim:first-child { border-top:none; }
+  .ky-sure { display:flex; align-items:center; gap:8px; font-size:14px; margin-top:6px; } .ky-sure input { width:110px; margin:0; padding:7px; }
+  #kyAyarForm select { padding:7px; border:1px solid var(--line); border-radius:6px; font: inherit; margin: 4px 0 10px; }
+  #kyPencere { width: min(480px, 96vw); } #kyPencere form { padding:16px; } #kyPencere h2 { margin:0 0 8px; font-size:18px; }
+  #kyPencere label { display:block; font-size:14px; margin-top:8px; } #kyPencere input[type=text], #kyPencere input[type=tel], #kyPencere input:not([type]) { margin:4px 0 0; }
+  .ky-dukkanlar { display:grid; gap:4px; margin-top:4px; }
+  tr.ky-vurgu td { background:#ddf4ff !important; }
+  #kySiparisDetay th { width: 40%; color: var(--muted); font-weight: 600; }
+  .ky-pdugmeler { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -119,10 +172,12 @@
         <label class="switch"><input type="checkbox" id="globalSwitch" /><span class="track"></span></label>
       </div>
     </div>
+    <div id="kyUyari" class="ky-uyari hidden" role="alert"></div>
     <div class="tabs">
       <button id="tabInst" class="active">İşletmeler</button>
       <button id="tabReport">Sipariş sayıları</button>
       <button id="tabSetup">Yeni kurulum</button>
+      <button id="tabCourier">Kuryeler<span id="kyRozet" class="ky-rozet hidden"></span></button>
     </div>
     <section id="setupView" class="hidden">
       <div id="codeBox"></div>
@@ -149,6 +204,90 @@
       <div class="card">
         <div class="name" style="margin-bottom:6px">Bekleyen ve son kurulumlar</div>
         <div id="setupList" class="muted">-</div>
+      </div>
+    </section>
+    <!-- Kuryeler (ortak defter) -->
+    <section id="courierView" class="hidden">
+      <div class="ky-alt" role="tablist">
+        <button type="button" data-ky-sekme="siparisler" class="active">Canlı siparişler</button>
+        <button type="button" data-ky-sekme="kuryeler">Kuryeler</button>
+        <button type="button" data-ky-sekme="kasa">Kasa defteri</button>
+        <button type="button" data-ky-sekme="ayarlar">Ayarlar</button>
+        <span class="muted ky-sag" id="kyGuncelleme"></span>
+      </div>
+      <div id="kyMsg" class="msg hidden"></div>
+      <div id="kyKurulmamis" class="card hidden">
+        <b>Ortak defter merkezde kurulu değil.</b>
+        <div class="muted">Kurye uygulaması ve bu sekme için Supabase'de ortak defter SQL'i çalıştırılmalı (supabase/migrations-taslak). Diğer sekmeler etkilenmez.</div>
+      </div>
+      <div id="kyIcerik" class="hidden">
+        <div id="kyOzet" class="ky-ozet"></div>
+        <div id="kySkPos" class="card">
+          <div class="row"><b>POS cihazları</b><span class="muted" id="kyPosAlt">Kuryedeki işletme POS'ları · eşik aşılınca satır kırmızı olur ve yöneticilere bir kez bildirim gider</span></div>
+          <div class="scroll"><table class="report ky-tablo" id="kyTabloPos">
+            <thead><tr><th>İşletme</th><th>Cihaz</th><th>Kimde</th><th>Ne zamandır</th><th>Sipariş</th><th></th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="muted hidden" id="kyPosBos">Şu an kuryede POS yok.</p>
+        </div>
+        <div id="kySkBorc" class="card hidden">
+          <div class="row"><b>Nakit borçları</b><span class="muted" id="kyBorcAlt">Kapıda nakit siparişte parayı işletmeye sonra verecek kuryelerin borcu (kurye × işletme) · kayıtlar silinmez</span></div>
+          <div class="scroll"><table class="report ky-tablo" id="kyTabloBorc">
+            <thead><tr><th>Kurye</th><th>İşletme</th><th>Borç</th><th>Onay bekleyen</th><th>En eski açık borç</th><th></th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="muted hidden" id="kyBorcBos">Açık nakit borcu yok.</p>
+        </div>
+        <div id="kySkSiparis" class="card">
+          <div class="row"><label class="chk ky-chk"><input type="checkbox" id="kyBitenGizle" /> Teslim / iptal olanları gizle</label>
+            <span class="muted">Son 12 saat · 10 sn'de bir yenilenir · müşteri bilgisi gösterilmez</span></div>
+          <div id="kySutunlar" class="ky-sutunlar"></div>
+          <div class="scroll"><table class="report ky-tablo" id="kyTabloSiparis">
+            <thead><tr><th>Geliş</th><th>Dükkân</th><th>Sipariş</th><th>Mahalle</th><th class="num">Tutar</th><th>Ödeme</th><th>Durum</th><th>Kurye</th><th>Aldı</th><th>Dükkândan</th><th>Teslim</th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="muted hidden" id="kySiparisBos">Son 12 saatte sipariş yok.</p>
+        </div>
+        <div id="kySkKurye" class="card hidden">
+          <div class="row"><button type="button" class="primary" id="kyYeniKurye">+ Yeni kurye</button>
+            <label class="chk ky-chk"><input type="checkbox" id="kyPasifGoster" /> Pasif kuryeleri göster</label></div>
+          <div class="scroll"><table class="report ky-tablo" id="kyTabloKurye">
+            <thead><tr><th>Kurye</th><th>Telefon</th><th>Durum</th><th>Paket</th><th class="num">İşletmelere borcu</th><th>Dükkânlar</th><th>Uygulama</th><th></th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="muted hidden" id="kyKuryeBos">Henüz kurye yok. "+ Yeni kurye" ile ekleyin.</p>
+        </div>
+        <div id="kySkKasa" class="card hidden">
+          <!-- 09.11: "Kuryelerdeki nakit" ve "Teslim al" kalktı (para işletmeye verilir; Kuryeler sekmesinde "Nakit borçları") -->
+          <div class="muted">Kapıda toplanan nakit kayıtları (bilgi için). Kurye parayı merkeze değil işletmeye verir; borçlar Kuryeler sekmesinde "Nakit borçları"nda. Eski teslim kayıtları silinmez.</div>
+          <b style="display:block;margin-top:14px">Hareketler <span class="muted">(son 100)</span></b>
+          <div class="scroll"><table class="report ky-tablo" id="kyTabloKasa">
+            <thead><tr><th>Zaman</th><th>Kurye</th><th>Tür</th><th class="num">Tutar</th><th>Sipariş</th><th>Açıklama</th><th>Onaylayan</th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="muted hidden" id="kyKasaBos">Henüz kasa hareketi yok.</p>
+        </div>
+        <div id="kySkAyar" class="card hidden">
+          <b>Sipariş kimse almazsa</b>
+          <div class="muted">Kurye şirketi bazında. Her adım ayrı açılıp kapatılır.</div>
+          <div id="kyAyarForm"></div>
+          <b style="display:block;margin-top:16px">Gecikme ve telefon uyarıları</b>
+          <div class="muted">Eşik aşılınca sipariş "Sorunlu" sütununa düşer, nedeni yazar ve yöneticilere bir kez bildirim gider. Bütün şirketler için tek ayar.</div>
+          <div id="kyEsikForm"></div>
+          <b style="display:block;margin-top:16px">Varış süresi</b>
+          <div class="muted">Kurye siparişi alırken dükkâna kaç dakikada varacağını bu seçeneklerden seçer. Söz verilen saat + tolerans geçerse sipariş "Sorunlu"ya düşer ve yöneticilere bir kez bildirim gider. Telefonlar yeni ayarı bir sonraki teklifte alır.</div>
+          <div id="kyVarisForm"></div>
+          <b style="display:block;margin-top:16px">İşletme notları</b>
+          <div class="muted">İşletme JetTakip programında kurye kartından bunlardan birine tek dokunuşla basar; not kuryenin telefonuna kısa sesli bildirim olarak gider ve görev kartında görünür. Aynı not aynı siparişe 30 sn içinde ikinci kez gitmez. Notlar silinmez; siparişin ayrıntısında görünür.</div>
+          <div id="kyNotForm"></div>
+          <b style="display:block;margin-top:16px">Fiş fotoğrafı</b>
+          <div class="muted">Açıksa kapıda kartlı siparişte kurye POS fişinin fotoğrafını çekmeden "Teslim ettim" açılmaz. Sadece bundan sonra yazılan siparişleri etkiler.</div>
+          <div id="kyFisForm"></div>
+          <b style="display:block;margin-top:16px">POS cihazları</b>
+          <div class="muted">Kartlı siparişte kurye işletmenin POS'unu alınca kaydedilir. POS eşikten uzun süre kuryede kalırsa kuryenin telefonu hatırlatır, yöneticilere bir kez bildirim gider. Cihazlar silinmez, pasif yapılır. Hiç cihazı olmayan işletmede ilk kartlı siparişte "POS 1" kendiliğinden açılır.</div>
+          <div id="kyPosForm"></div>
+          <b style="display:block;margin-top:16px">Nakit borcu</b>
+          <div class="muted">Kapıda nakit siparişte kurye "Paketi aldım"dan sonra parayı işletmeye şimdi verip vermediğini söyler; vermediyse kurye × işletme borcu yazılır. Kurye "Parayı verdim" deyince işletme JetTakip programında "aldım" (ya da "almadım / eksik aldım") der; anlaşmazlığı siz Nakit borçları kutusunda çözersiniz. İki kural: kuryenin bütün işletmelere toplam borcu sınırı geçince, ya da bir işletmeye borcu süreyi geçip ödenmeyince yöneticilere bir kez bildirim gider, kuryenin telefonu bir kez hatırlatır. Kayıtlar silinmez.</div>
+          <div id="kyBorcForm"></div>
+          <b style="display:block;margin-top:16px">Yönetici uyarıları ("kimse almadı")</b>
+          <div class="muted">Panel açık olmasa da telefonunuza gelir. Bildirime dokununca panelde o sipariş açılır.</div>
+          <div id="kyBildirim"></div>
+        </div>
       </div>
     </section>
     <section id="reportView" class="card hidden">
@@ -193,6 +332,14 @@
   <pre id="logContent"></pre>
 </dialog>
 
+<dialog id="kyPencere">
+  <form method="dialog" id="kyPForm" novalidate>
+    <h2 id="kyPBaslik"></h2>
+    <div id="kyPIcerik"></div>
+    <div id="kyPMsg" class="msg err hidden" role="alert"></div>
+    <div class="ky-pdugmeler"><button type="button" id="kyPVazgec">Vazgeç</button><button type="submit" class="primary" id="kyPTamam">Kaydet</button></div>
+  </form>
+</dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
 <script>
 // ===================== AYARLAR (kurulumda doldurulur) =====================
@@ -233,6 +380,7 @@ const FEATURES = [
   { key: 'jettakip', label: 'JetTakip entegrasyonu (API siparişleri)', defaultOff: true },
   { key: 'migros', label: 'Migros Yemek bağlantısı (Chrome eklentisi)', defaultOff: true },
   { key: 'trendyol_status', label: 'Trendyol / Getir "Yola çıktı / Teslim edildi" düğmeleri', defaultOff: true, minVersion: '2.9.8' },
+  { key: 'kurye_defteri', label: 'Kurye uygulaması defteri (siparişleri ortak deftere de yazar)', defaultOff: true, minVersion: '2.9.9' },
 ];
 const CMD_LABEL = { restart: 'Yeniden başlat', upload_logs: 'Kayıt iste', update_now: 'Şimdi güncelle', wa_reset: "WhatsApp'ı sıfırla (QR göster)" };
 
@@ -258,6 +406,7 @@ async function start() {
   $('btnLogout').classList.remove('hidden');
   clearInterval(timer);
   timer = setInterval(load, 15000);
+  if (window.kyBaslat) kyBaslat();
 }
 
 async function logout() {
@@ -327,12 +476,16 @@ function programSupports(i, f) {
   if (f.key === 'accept_button' && st.accept_button_supported) return true;
   if (f.key === 'trendyol_status' && st.trendyol_status_supported) return true;
   if (f.key === 'map_link' && st.map_link_supported) return true;
+  if (f.key === 'kurye_defteri' && st.kurye_defteri_supported) return true;
   return false;
 }
 
 function featureToggles(effective, custom, prefix, inst) {
   // İşletme kartında: programın tanımadığı yeni özellik gösterilmez (açıkça açılmışsa yine görünür)
-  const list = inst ? FEATURES.filter((f) => programSupports(inst, f) || (custom && custom[f.key] !== undefined)) : FEATURES;
+  const list0 = inst ? FEATURES.filter((f) => programSupports(inst, f) || (custom && custom[f.key] !== undefined)) : FEATURES;
+  // 07.11: "Kurye uygulaması defteri" merkezde ortak defter SQL'i kurulu değilken gösterilmez (yanlışlıkla açılmasın);
+  // önceden açıkça ayarlanmışsa kapatılabilsin diye görünür. window.defterKurulu Kuryeler bölümünün okumasından gelir.
+  const list = list0.filter((f) => f.key !== 'kurye_defteri' || window.defterKurulu === true || (custom && custom[f.key] !== undefined));
   return list.map((f) => `<label class="${custom && custom[f.key] !== undefined ? 'custom' : ''}" title="${custom && custom[f.key] !== undefined ? 'Bu işletmeye özel ayar' : 'Varsayılan paketten'}">
       <span class="switch"><input type="checkbox" data-feature="${f.key}" data-scope="${prefix}" ${featureOn(effective, f) ? 'checked' : ''} /><span class="track"></span></span>
       <span class="t">${esc(f.label)}</span></label>`).join('');
@@ -608,9 +761,10 @@ function bekciBlock(i) {
   const h = b.saatler || BEKCI_VARSAYILAN;
   const satir = ([g, ad]) => {
     const a = h[g];
-    return `<div class="row" data-bekci-gun="${g}" style="gap:8px;align-items:center;margin:2px 0"><span style="width:90px">${ad}</span>
-      <label class="chk"><input type="checkbox" name="kapali" ${a ? '' : 'checked'} /> kapalı</label>
-      <input type="time" name="acilis" value="${esc(a ? a[0] : '11:00')}" /> – <input type="time" name="kapanis" value="${esc(a ? a[1] : '23:00')}" /></div>`;
+    // 06.11: her gün tek satır: [gün] [kapalı] [açılış] – [kapanış] (CSS .bekci-gun; dar ekranda da taşmaz)
+    return `<div class="bekci-gun" data-bekci-gun="${g}"><span class="gun">${ad}</span>
+      <label class="kapali"><input type="checkbox" name="kapali" ${a ? '' : 'checked'} /> kapalı</label>
+      <input type="time" name="acilis" value="${esc(a ? a[0] : '11:00')}" aria-label="${ad} açılış" /><span class="ayrac">–</span><input type="time" name="kapanis" value="${esc(a ? a[1] : '23:00')}" aria-label="${ad} kapanış" /></div>`;
   };
   return `<details class="pkg settings" data-bekci-form="${esc(i.id)}"><summary>Bekçi ve çalışma saatleri${b.aktif ? ' (açık)' : ' (kapalı)'}</summary>
     <label class="chk" style="margin:6px 0"><input type="checkbox" name="aktif" ${b.aktif ? 'checked' : ''} /> Bekçi açık (çalışma saatinde sorun olursa healthchecks.io uyarır)</label>
@@ -1343,11 +1497,14 @@ function showTab(which) {
   $('tabInst').classList.toggle('active', which === 'inst');
   $('tabReport').classList.toggle('active', which === 'report');
   $('tabSetup').classList.toggle('active', which === 'setup');
+  $('tabCourier').classList.toggle('active', which === 'courier');
   $('instView').classList.toggle('hidden', which !== 'inst');
   $('reportView').classList.toggle('hidden', which !== 'report');
   $('setupView').classList.toggle('hidden', which !== 'setup');
+  $('courierView').classList.toggle('hidden', which !== 'courier');
   if (which === 'report') loadReport();
   if (which === 'setup') renderSetup();
+  if (which === 'courier' && window.kyYenile) kyYenile();
 }
 
 async function setGlobal(enabled) {
@@ -1471,6 +1628,7 @@ $('btnCloseLog').onclick = () => $('logDialog').close();
 $('tabInst').onclick = () => showTab('inst');
 $('tabReport').onclick = () => showTab('report');
 $('tabSetup').onclick = () => showTab('setup');
+$('tabCourier').onclick = () => showTab('courier');
 $('nSource').onchange = syncNewSource;
 $('btnCreateSetup').onclick = createSetup;
 $('btnCancelEdit').onclick = () => { resetNewForm(); $('newMsg').classList.add('hidden'); };
@@ -1482,6 +1640,1269 @@ $('repNext').onclick = () => stepReport(1);
 $('repDay').onchange = () => { if ($('repDay').value) { repAnchor = $('repDay').value; loadReport(); } };
 $('btnCsv').onclick = downloadCsv;
 start();
+</script>
+<script>
+// ===================== KURYELER (ortak defter) =====================
+// Veri tek çağrıyla (defter_admin_ozet) 10 sn'de bir gelir; işlemler defter_admin_* fonksiyonları (hepsi is_admin() ister).
+// Müşteri bilgisi bu sayfaya hiç gelmez; kurye telefonunun sadece son 4 hanesi gelir. Ortak defter SQL'i kurulu değilse
+// sekme "kurulmamış" der, diğer sekmeler etkilenmez.
+// ---- KURYELER ÇEKİRDEK (tests/panel/kuryeler-cekirdek.test.js bu bloğu ayırıp node'da çalıştırır) ----
+const KY = (() => {
+  const VARSAYILAN_SINIR = 3;
+  const SURE_EN_AZ = 30, SURE_EN_COK = 900;
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const tl = (n) => (n == null || n === '' || isNaN(Number(n)) ? '-' :
+    Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' TL');
+  const saat = (t) => (t ? new Date(t).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' }) : '');
+  const tarihSaat = (t) => (t ? new Date(t).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' }) : '');
+  const dk = (a, b) => (a && b ? Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000)) : null);
+  const KAYNAK = { trendyol: 'Trendyol', getir: 'Getir', yemeksepeti: 'Yemeksepeti', migros: 'Migros', telefon: 'Telefon', jettakip: 'JetTakip', elle: 'Elle' };
+  const ODEME = { nakit: 'Nakit', kapida_kart: 'Kapıda kart', yemek_karti: 'Yemek kartı', online: 'Online', bilinmiyor: 'Bilinmiyor' };
+  const KASA_TUR = { tahsilat: 'Tahsilat', teslim: 'Merkeze teslim', duzeltme: 'Düzeltme' };
+
+  /** Kimse almadı uyarısı olan (yönetici adımı) ve hâlâ bekleyen siparişler */
+  const alarmdakiler = (veri) => (veri.siparisler || []).filter((o) => o.durum === 'yeni' && o.yonetici_uyari);
+
+  function siparisDurumu(o, simdi) {
+    const n = simdi || new Date();
+    switch (o.durum) {
+      case 'yeni': {
+        const b = dk(o.olusturma, n);
+        if (o.yonetici_uyari) return { metin: `Kimse almadı · ${b} dk`, sinif: 'kirmizi', uyari: true };
+        return { metin: `Bekliyor · ${b} dk` + (o.genisletildi ? ' · herkese açıldı' : ''), sinif: 'turuncu' };
+      }
+      case 'alindi': return { metin: 'Kuryede', sinif: 'mavi' };
+      case 'restoranda': return { metin: 'Restoranda', sinif: 'mavi' };
+      case 'yolda': return { metin: o.fis_zorunlu && !o.fis_alindi ? 'Paket alındı · fiş bekleniyor' : 'Paket alındı', sinif: 'mavi' };
+      case 'teslim': return { metin: 'Teslim', sinif: 'yesil' };
+      case 'teslim_edilemedi': return { metin: 'Teslim edilemedi', sinif: 'kirmizi' };
+      case 'iptal': return { metin: 'İptal', sinif: 'gri' };
+      default: return { metin: o.durum || '-', sinif: 'gri' };
+    }
+  }
+
+  // ---- gecikme ve telefon eşikleri (03.11): merkezdeki tek ayar tablosu (genel_ayarlar); yoksa varsayılan
+  const ESIK = { havuz_esik_dk: 5, restoranda_esik_dk: 15, teslim_esik_dk: 30, sessiz_esik_dk: 5 };
+  function esikler(veri) {
+    const g = (veri && veri.genel_ayarlar) || {}, e = { ...ESIK };
+    for (const k of Object.keys(ESIK)) if (Number(g[k]) > 0) e[k] = Number(g[k]);
+    return e;
+  }
+  const dkTam = (a, b) => (a && b ? Math.max(0, Math.floor((new Date(b) - new Date(a)) / 60000)) : null);
+  const onceYaz = (d) => (d == null ? '' : d < 1 ? 'az önce' : d < 60 ? `${d} dk önce` : `${Math.floor(d / 60)} sa ${d % 60} dk önce`);
+  /** Telefon sağlığı: { metin: "son sinyal 2 dk önce · pil %80", sessiz } — sessiz: vardiyada ve eşikten uzun sinyal yok */
+  function sinyalDurumu(k, veri, simdi) {
+    const n = simdi || new Date(), d = dkTam(k.son_sinyal, n);
+    const sessiz = Boolean(k.aktif && k.mesaide && (k.sessiz_uyari || (d != null && d >= esikler(veri).sessiz_esik_dk)));
+    const pil = k.pil != null ? ` · pil %${k.pil}${k.sarjda ? ' (şarjda)' : ''}` : '';
+    return { sessiz, dk: d, metin: k.son_sinyal ? `son sinyal ${onceYaz(d)}${pil}` : 'sinyal yok' };
+  }
+  // 09.11: kuryenin işletmelere nakit borcu (defter_admin_nakit_borclar; eski "elindeki nakit / merkeze teslim" kalktı).
+  // borc: artıdaki bakiyelerin toplamı; esikAsildi: toplam sınırı aştı; sureAsildi: bir işletmeye borcu süreyi geçti; itiraz: anlaşmazlıktaki tutar
+  function nakitKurye(veri, id) {
+    const l = ((veri && veri.nakit && veri.nakit.ciftler) || []).filter((c) => c.kurye_id === id);
+    return {
+      borc: l.reduce((t, c) => t + Math.max(0, Number(c.bakiye) || 0), 0),
+      esikAsildi: l.some((c) => c.esik_asildi === true), sureAsildi: l.some((c) => c.sure_asildi === true),
+      itiraz: l.reduce((t, c) => t + (Number(c.itirazli) || 0), 0),
+    };
+  }
+  function kuryeDurumu(k, veri, simdi) {
+    const sinir = k.paket_siniri || VARSAYILAN_SINIR;
+    const nk = nakitKurye(veri, k.id);
+    const nakitAsti = nk.esikAsildi || nk.sureAsildi;
+    const sessiz = sinyalDurumu(k, veri, simdi).sessiz;
+    let metin = 'Mesai dışı', sinif = 'gri';
+    if (!k.aktif) metin = 'Pasif';
+    else if (k.kilitli) { metin = 'Kilitli' + (k.kilit_nedeni ? ': ' + k.kilit_nedeni : ''); sinif = 'kirmizi'; }
+    else if (k.mesaide && sessiz) { metin = 'Telefon sessiz'; sinif = 'kirmizi'; }
+    else if (k.mesaide) { metin = 'Mesaide'; sinif = 'yesil'; }
+    return { metin, sinif, sinir, dolu: k.aktif_paket >= sinir, nakitAsti, sessiz };
+  }
+
+  function ozetSayilari(veri) {
+    const s = veri.siparisler || [], k = (veri.kuryeler || []).filter((x) => x.aktif);
+    return {
+      bekleyen: s.filter((o) => o.durum === 'yeni').length,
+      alarm: alarmdakiler(veri).length,
+      yolda: s.filter((o) => ['alindi', 'restoranda', 'yolda'].includes(o.durum)).length,
+      teslim: s.filter((o) => o.durum === 'teslim').length,
+      mesaide: k.filter((x) => x.mesaide && !x.kilitli).length,
+      kilitli: k.filter((x) => x.kilitli).length,
+      nakit: ((veri.nakit && veri.nakit.ciftler) || []).reduce((t, c) => t + Math.max(0, Number(c.bakiye) || 0), 0),
+      nakitAsan: k.filter((x) => kuryeDurumu(x, veri).nakitAsti).length,
+      nakitItiraz: ((veri.nakit && veri.nakit.ciftler) || []).reduce((t, c) => t + (c.odemeler || []).filter((o) => o.durum === 'itiraz').length, 0),
+      sessiz: k.filter((x) => sinyalDurumu(x, veri).sessiz).length,
+    };
+  }
+
+  // ---- canlı sütunlar (02.11): Havuzda / Kuryede / Alındı / Sorunlu
+  const KURYEDE = ['alindi', 'restoranda'];
+  const nedenAdi = (veri, kod) => ((veri.nedenler || []).find((n) => n.kod === kod) || {}).ad || kod;
+  /**
+   * Gecikme (03.11; eski sabit "10 dk alınmadı" kuralının yerine): eşikler merkezde (genel_ayarlar), panelden değişir.
+   * Süre, siparişin o duruma girdiği andan (durum_zamani; eski kayıtta ilgili zaman). Metin ya da null.
+   */
+  function gecikme(o, veri, simdi) {
+    const n = simdi || new Date(), e = esikler(veri);
+    if (o.durum === 'yeni') { const d = dkTam(o.durum_zamani || o.olusturma, n); return d != null && d >= e.havuz_esik_dk ? `havuzda ${d} dk` : null; }
+    if (o.durum === 'restoranda') { const d = dkTam(o.durum_zamani || o.restorana_varis, n); return d != null && d >= e.restoranda_esik_dk ? `restoranda ${d} dk` : null; }
+    if (o.durum === 'yolda') { const d = dkTam(o.durum_zamani || o.dukkandan_alindi_zamani, n); return d != null && d >= e.teslim_esik_dk ? `paket alındı ${d} dk, teslim yok` : null; }
+    return null;
+  }
+  /** Sorunlu mu? Neden metni ya da null: kimse almadı, gecikme, teslim edilemedi, iptal olup kuryede kalan ("Gördüm" denmemiş) */
+  /** Varış (05.11): paket alındı, söz verilen saat + tolerans geçti, kurye hâlâ dükkâna gelmedi → Sorunlu nedeni; yoksa null */
+  function varisGecikti(o, veri, simdi) {
+    if (!o || o.durum !== 'alindi' || !o.varis_hedef) return null;
+    const ga = (veri && veri.genel_ayarlar) || {}, tol = Number.isFinite(Number(ga.varis_tolerans_dk)) ? Number(ga.varis_tolerans_dk) : 5;
+    const gec = Math.floor(((simdi || new Date()) - new Date(o.varis_hedef)) / 60000);
+    return gec > tol ? `Kurye söz verdiği saatte gelmedi · ${gec} dk` : null;
+  }
+  function sorunNedeni(o, veri, simdi) {
+    const n = simdi || new Date();
+    const v = varisGecikti(o, veri, n);
+    if (v) return v;
+    if (o.durum === 'yeni' && o.yonetici_uyari) return `Kimse almadı · ${dkTam(o.durum_zamani || o.olusturma, n)} dk`;
+    if (['yeni', 'restoranda', 'yolda'].includes(o.durum)) return gecikme(o, veri, n);
+    if (o.durum === 'teslim_edilemedi') return 'Teslim edilemedi' + (o.teslim_edilemedi_neden ? ` · ${nedenAdi(veri, o.teslim_edilemedi_neden)}` : '');
+    if (o.durum === 'iptal' && o.kurye_id && ['alindi', 'restoranda', 'yolda'].includes(o.iptal_onceki_durum) && !o.iptal_goruldu) return 'İptal · kurye henüz görmedi';
+    return null;
+  }
+  function sutunlar(veri, simdi) {
+    const s = { havuzda: [], kuryede: [], alindi: [], sorunlu: [] };
+    for (const o of veri.siparisler || []) {
+      const sorun = sorunNedeni(o, veri, simdi);
+      if (sorun) s.sorunlu.push({ ...o, sorun });
+      else if (o.durum === 'yeni') s.havuzda.push(o);
+      else if (KURYEDE.includes(o.durum)) s.kuryede.push(o);
+      else if (o.durum === 'yolda') s.alindi.push(o);
+    }
+    const eski = (a, b) => String(a.olusturma).localeCompare(String(b.olusturma));
+    for (const k of Object.keys(s)) s[k].sort(eski);
+    return s;
+  }
+  // Yönetici düğmeleri (merkezdeki geçiş tablosuyla aynı): havuza geri al = kuryede / restoranda; elle ata = havuzda
+  const geriAlinabilir = (o) => KURYEDE.includes(o.durum);
+  const atanabilir = (o) => o.durum === 'yeni';
+  // Kuryeye devret (02.11 öğleden sonra): sadece "paket alındı" (yolda) ve kuryesi olan; durum aynı kalır
+  const devredilebilir = (o) => o.durum === 'yolda' && !!o.kurye_id;
+  /** Elle atamadan önce gösterilecek uyarılar (atama yine yapılabilir; merkez de kayda yazar) */
+  function atamaUyarilari(k) {
+    const u = [];
+    const sinir = k.paket_siniri || VARSAYILAN_SINIR;
+    if (Number(k.aktif_paket) >= sinir) u.push(`paket sınırı dolu (${k.aktif_paket}/${sinir}): sınır aşılacak`);
+    if (!k.mesaide) u.push('mesaide değil');
+    if (k.kilitli) u.push('kilitli' + (k.kilit_nedeni ? `: ${k.kilit_nedeni}` : ''));
+    return u;
+  }
+  /** defter_admin_siparis_ata / defter_admin_geri_al cevabı → yönetici yazısı (tamamsa null) */
+  function siparisIslemHatasi(r) {
+    if (r && r.sonuc === 'tamam') return null;
+    return { gecersiz_gecis: 'Sipariş durumu değişmiş (başka biri almış ya da ilerlemiş). Liste yenilendi.', yok: 'Sipariş bulunamadı.', kurye_yok: 'Kurye bulunamadı ya da pasif.',
+      ayni_kurye: 'Paket zaten bu kuryede.' }[r && r.sonuc] || 'İşlem yapılamadı.';
+  }
+
+  function telefonDuzelt(t) {
+    let d = String(t || '').replace(/[^0-9]/g, '');
+    if (/^0[0-9]{10}$/.test(d)) d = '9' + d;
+    else if (/^5[0-9]{9}$/.test(d)) d = '90' + d;
+    return /^90[0-9]{10}$/.test(d) ? d : null;
+  }
+  function sinirOku(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    const n = Number(s);
+    if (!Number.isInteger(n) || n < 1 || n > 20) throw new Error('Paket sınırı 1 ile 20 arasında tam sayı olmalı (boş = 3)');
+    return n;
+  }
+  function tutarOku(v, { bosOlur = true, ad = 'Tutar' } = {}) {
+    const s = String(v == null ? '' : v).trim().replace(/\s|TL/gi, '');
+    if (!s) { if (bosOlur) return null; throw new Error(ad + ' boş olamaz'); }
+    const n = Number(/,/.test(s) ? s.replace(/\./g, '').replace(',', '.') : /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, '') : s);
+    if (!isFinite(n) || n < 0) throw new Error(ad + ' geçerli bir sayı olmalı');
+    return Math.round(n * 100) / 100;
+  }
+  /** Süre: "90", "90 sn", "1:30", "2 dk" → saniye; 30 sn - 15 dk dışı hata */
+  function sureOku(v, ad = 'Süre') {
+    const s = String(v == null ? '' : v).trim().toLocaleLowerCase('tr-TR');
+    let n = NaN, m;
+    if ((m = /^(\d+):([0-5]\d)$/.exec(s))) n = Number(m[1]) * 60 + Number(m[2]);
+    else if ((m = /^(\d+)\s*(dk|dakika)$/.exec(s))) n = Number(m[1]) * 60;
+    else if ((m = /^(\d+)\s*(sn|saniye)?$/.exec(s))) n = Number(m[1]);
+    if (!Number.isInteger(n)) throw new Error(`${ad}: saniye ya da dk:sn yazın (ör. 90 ya da 1:30)`);
+    if (n < SURE_EN_AZ || n > SURE_EN_COK) throw new Error(`${ad} 30 sn ile 15 dk arasında olmalı`);
+    return n;
+  }
+  const sureYaz = (sn) => (sn % 60 ? (sn >= 60 ? `${Math.floor(sn / 60)} dk ${sn % 60} sn` : `${sn} sn`) : `${sn / 60} dk`);
+
+  function hataMetni(e) {
+    const m = String((e && e.message) || e || '');
+    if (/couriers_telefon_key|duplicate key.*telefon/i.test(m)) return 'Bu telefonla kayıtlı bir kurye zaten var.';
+    if (/couriers_telefon_check/i.test(m)) return 'Telefon 0555 111 22 33 biçiminde olmalı.';
+    if (/paket_siniri_check/i.test(m)) return 'Paket sınırı 1 ile 20 arasında olmalı.';
+    if (/nakit_esigi_check/i.test(m)) return 'Nakit eşiği 0 ya da daha büyük olmalı.';
+    if (/kuryedeki nakitten fazla/i.test(m)) { const x = /elinde ([0-9.]+)/.exec(m); return 'Kuryedeki nakitten fazla teslim alınamaz' + (x ? ` (elinde ${tl(x[1])}).` : '.'); }
+    if (/sure araligi disinda|_sn_check/i.test(m)) return 'Süreler 30 sn ile 15 dk arasında olmalı.';
+    if (/tutar pozitif/i.test(m)) return 'Tutar sıfırdan büyük olmalı.';
+    if (/kurye yok ya da pasif/i.test(m)) return 'Kurye pasif: önce Düzenle\'den aktif yapın.';
+    if (/neden zorunlu/i.test(m)) return 'Neden yazılmalı.';
+    if (/yetki yok|42501/i.test(m)) return 'Bu hesabın yönetici yetkisi yok.';
+    if (/failed to fetch|networkerror|load failed/i.test(m)) return 'Merkeze ulaşılamadı (internet bağlantısını kontrol edin).';
+    return 'İşlem yapılamadı: ' + m.slice(0, 160);
+  }
+  /** Ortak defter SQL'i merkezde kurulu değil mi? (fonksiyon yok hatası) */
+  const kurulmamisMi = (e) => /defter_admin_ozet|PGRST202|could not find the function|does not exist|schema "defter"/i.test(String((e && e.message) || e || ''));
+
+  const kisaAdOner = (ad) => {
+    const p = String(ad || '').trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return '';
+    return p.length === 1 ? p[0] : `${p[0]} ${p[p.length - 1][0].toLocaleUpperCase('tr-TR')}.`;
+  };
+
+  /** Web Push durumu → { kod, metin, dugme } (dugme: 'ac' | 'kapat' | null). iPhone'da sadece ana ekrana eklenmiş panelde çalışır. */
+  function pushDurumu({ destek, ios, standalone, izin, vapid, abone }) {
+    if (!destek) {
+      return ios && !standalone
+        ? { kod: 'ana_ekran', metin: 'iPhone\'da: Safari\'de Paylaş → "Ana Ekrana Ekle", sonra ana ekrandaki JetTakip simgesinden açıp buraya gelin (iOS 16.4 ve üstü).', dugme: null }
+        : { kod: 'destek_yok', metin: 'Bu tarayıcı web bildirimini desteklemiyor.', dugme: null };
+    }
+    if (!vapid) return { kod: 'merkez_yok', metin: 'Merkezde web bildirimi ayarlı değil (VAPID anahtarı yok).', dugme: null };
+    if (izin === 'denied') return { kod: 'reddedildi', metin: 'Bildirim izni reddedilmiş. Telefonun Ayarlar → Bildirimler → JetTakip bölümünden açın.', dugme: null };
+    if (abone && izin === 'granted') return { kod: 'acik', metin: 'Bu cihazda web bildirimi açık.', dugme: 'kapat' };
+    return { kod: 'kapali', metin: 'Bu cihazda web bildirimi kapalı.', dugme: 'ac' };
+  }
+  /** Kurye telefonunun bildirim yolu (04.11): "FCM + sorgu" / "sadece sorgu" (Google yok ya da TEST'te yok sayılıyor); bilinmiyorsa null */
+  /** Siparişin gösterilen no'su (05.11): dükkânın gördüğü kısa no; yoksa defterdeki kaynak no */
+  const no = (o) => '#' + ((o && (o.kisa_no || o.kaynak_no)) || '');
+  const bildirimYolu = (k) => (k && k.bildirim_yolu === 'fcm+sorgu' ? { metin: 'bildirim: FCM + sorgu', uyari: false }
+    : k && k.bildirim_yolu === 'sorgu' ? { metin: 'bildirim: sadece sorgu (Google yok)', uyari: true } : null);
+  /**
+   * Son deneme bildiriminin sonucu (04.11). d: kuryenin son_deneme'si; mesaide: kurye vardiyada mı; simdi: merkezin saati
+   * (veri.zaman; tarayıcı saatine güvenilmez). Döner { sinif: yesil | turuncu | kirmizi | gri, metin, bekliyor } ya da null.
+   * 30 sn içinde hiçbir yoldan gelmezse kırmızı "bildirim gelmiyor".
+   */
+  const DENEME_BEKLE_SN = 30;
+  function denemeSonucu(d, mesaide, simdi) {
+    if (!d || !d.olusturma) return null;
+    const gecen = (new Date(simdi || Date.now()) - new Date(d.olusturma)) / 1000;
+    const bekle = gecen < DENEME_BEKLE_SN;
+    const sn = (x) => `${Number(x).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} sn`;
+    const fcm = d.fcm_sn != null ? { ok: true, metin: `✓ FCM ${sn(d.fcm_sn)}` }
+      : d.kuyruk === 'alici_yok' ? { ok: false, metin: '✗ FCM gitmedi (telefonda Google / jeton yok)' }
+      : d.kuyruk === 'hata' ? { ok: false, metin: '✗ FCM gönderilemedi (merkez hatası)' }
+      : bekle ? { ok: null, metin: '… FCM bekleniyor' } : { ok: false, metin: '✗ FCM gelmedi' };
+    const sorgu = d.sorgu_sn != null ? { ok: true, metin: `✓ sorgu ${sn(d.sorgu_sn)}` }
+      : !mesaide ? { ok: null, metin: '– sorgu: kurye vardiyada değil (sorgu sadece vardiyada çalışır)' }
+      : bekle ? { ok: null, metin: '… sorgu bekleniyor' } : { ok: false, metin: '✗ sorgu gelmedi' };
+    const onde = d.fcm_onde === true || d.sorgu_onde === true ? ' · uygulama açıktı' : d.fcm_onde === false || d.sorgu_onde === false ? ' · uygulama arkadaydı' : '';
+    const biri = fcm.ok || sorgu.ok;
+    if (!biri && !bekle) return { sinif: 'kirmizi', bekliyor: false, metin: `${fcm.metin} · ${sorgu.metin} — bildirim gelmiyor, Hazırlık'ı kontrol edin` };
+    const ikisi = fcm.ok && (sorgu.ok || !mesaide);
+    return { sinif: !biri ? 'gri' : ikisi ? 'yesil' : 'turuncu', bekliyor: bekle && !(fcm.ok && sorgu.ok), metin: `${fcm.metin} · ${sorgu.metin}${onde}` };
+  }
+  const cihazAdi = (ua, standalone) => (/iPhone|iPad/.test(ua) ? (standalone ? 'iPhone (ana ekran)' : 'iPhone') : /Android/.test(ua) ? 'Android tarayıcı' : 'Bilgisayar tarayıcısı');
+  /** "#siparis=<uuid>" → uuid (küçük harf) ya da null */
+  const hashSiparis = (h) => { const m = /(?:^|[#&])siparis=([0-9a-f-]{36})(?:&|$)/i.exec(String(h || '')); return m ? m[1].toLowerCase() : null; };
+  const b64uBayt = (s) => { const t = String(s || '').replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(t + '='.repeat((4 - (t.length % 4)) % 4)), (c) => c.charCodeAt(0)); };
+
+  // ---- POS cihazı (06.11): defter_admin_ozet.poslar (açık oturumlar) ve isletme_poslari
+  const POS_ESIK_VARSAYILAN = 20;
+  /** Eşik (dk): genel_ayarlar.pos_esik_dk; eski merkezde 20 */
+  const posEsik = (veri) => { const n = Number(((veri && veri.genel_ayarlar) || {}).pos_esik_dk); return Number.isFinite(n) && n > 0 ? n : POS_ESIK_VARSAYILAN; };
+  /**
+   * "POS cihazları" kutusunun satırları: en uzun süredir kuryede olan üstte. Süre panelin değil merkezin saatiyle (veri.zaman)
+   * hesaplanır; eşik aşıldıysa kırmızı. Sipariş(ler) kısa no ile (müşteri bilgisi yok).
+   */
+  function posSatirlari(veri, simdi) {
+    const n = simdi || (veri && veri.zaman ? new Date(veri.zaman) : new Date()), esik = posEsik(veri);
+    return ((veri && veri.poslar) || []).map((p) => {
+      const dkS = Math.max(0, Math.floor((n - new Date(p.baslangic)) / 60000));
+      return { ...p, dk: dkS, kirmizi: dkS >= esik, siparisMetni: (p.siparisler || []).map((s) => no(s)).filter(Boolean).join(', ') };
+    }).sort((a, b) => b.dk - a.dk);
+  }
+  /** İşletmenin cihazları (ekleme sırasıyla); kuryede olan işaretli */
+  const isletmePoslari = (veri, dukkanId) => ((veri && veri.isletme_poslari) || []).filter((p) => p.dukkan_id === dukkanId);
+  /** Cihaz adı: 1–40 karakter */
+  function posAdiOku(v) {
+    const t = String(v || '').trim();
+    if (!t) throw new Error('Cihaz adı boş olamaz (ör. "POS 1 (Ingenico)").');
+    if (t.length > 40) throw new Error('Cihaz adı en çok 40 karakter.');
+    return t;
+  }
+  /** Eşik: 5–240 tam dakika */
+  function posEsikOku(v) {
+    const x = Number(String(v).trim());
+    if (!Number.isInteger(x) || x < 5 || x > 240) throw new Error('POS eşiği 5–240 dk arası tam sayı olmalı.');
+    return x;
+  }
+  /** İşletme notu seçenekleri (06.11): satır satır; 1–6 tane, her biri 1–40 harf, aynısı iki kez olmaz */
+  function notListesiOku(v) {
+    const l = String(v || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    if (l.length < 1 || l.length > 6) throw new Error('1–6 not yazın (her satıra bir tane).');
+    const uzun = l.find((x) => x.length > 40);
+    if (uzun) throw new Error(`"${uzun.slice(0, 20)}…" çok uzun: en çok 40 harf.`);
+    if (new Set(l.map((x) => x.toLocaleLowerCase('tr-TR'))).size !== l.length) throw new Error('Aynı not iki kez yazılmış.');
+    return l;
+  }
+  const NOT_VARSAYILAN = ['Paket hazır', '5 dk daha', 'Ürün eksik, ara'];
+  const POS_KAYIT_TUR = { aldi: 'POS alındı', siparis_eklendi: 'Aynı POS ile', iade: 'İade edildi', duzeltme: 'Yönetici: iade edildi' };
+  // ---- Fiş fotoğrafı (04.11): defter_admin_fis_foto → resim adresi (sadece geçerli base64; değilse null) ve indirme adı
+  const fisResimAdresi = (b64) => (typeof b64 === 'string' && b64.length > 100 && /^[A-Za-z0-9+/]+={0,2}$/.test(b64) ? 'data:image/jpeg;base64,' + b64 : null);
+  const fisDosyaAdi = (s) => `fis-${String((s && (s.kisa_no || s.kaynak_no)) || 'siparis').replace(/[^A-Za-z0-9_-]+/g, '') || 'siparis'}.jpg`;
+
+  // Söz verilen varış (06.11 akşam): kartta kısa satır, sadece kurye dükkâna varmadan (alindi)
+  const sozSatiri = (o) => (o && o.durum === 'alindi' && o.varis_hedef ? `söz ${saat(o.varis_hedef)}${Number(o.varis_gecikme) > 0 ? ` (+${Number(o.varis_gecikme)} dk)` : ''}` : '');
+
+  // ---- Nakit borcu (08.11; defter_admin_nakit_borclar): eşiği aşan önce, sonra en büyük borç; en eski açık borcun yaşı (dk)
+  // 09.11: anlaşmazlık (itirazlı ödeme) en üstte, sonra sınırı / süreyi aşan, sonra büyük borç
+  function nakitSatirlari(n, simdi) {
+    const z = simdi || new Date();
+    const uyari = (c) => c.esik_asildi === true || c.sure_asildi === true;
+    return ((n && n.ciftler) || []).map((c) => ({ ...c, bakiye: Number(c.bakiye) || 0, bekleyen: Number(c.bekleyen) || 0, itirazli: Number(c.itirazli) || 0,
+      dk: c.en_eski ? Math.max(0, Math.floor((z - new Date(c.en_eski)) / 60000)) : null }))
+      .sort((a, b) => (b.itirazli > 0) - (a.itirazli > 0) || uyari(b) - uyari(a) || b.bakiye - a.bakiye);
+  }
+  /** Anlaşmazlık çözümü: kabul edilen tutar 0..bildirilen ("250,50" yazılabilir) */
+  function nakitCozumOku(v, ust) {
+    const x = Number(String(v).trim().replace(/\./g, '').replace(',', '.'));
+    if (String(v).trim() === '' || !Number.isFinite(x) || x < 0 || x > Number(ust)) throw new Error(`Kabul edilen tutar 0 ile ${tl(ust)} arası olmalı.`);
+    return Math.round(x * 100) / 100;
+  }
+  /** Eşik: 0–100.000 TL ("1.500" / "1500,50" yazılabilir; 0 = bildirim yok) */
+  function nakitEsikOku(v) {
+    const x = Number(String(v).trim().replace(/\./g, '').replace(',', '.'));
+    if (!Number.isFinite(x) || x < 0 || x > 100000) throw new Error('Nakit borç eşiği 0–100.000 TL arası olmalı.');
+    return Math.round(x * 100) / 100;
+  }
+  /** Hatırlatma: 10–720 tam dakika */
+  function nakitHatirlatmaOku(v) {
+    const x = Number(String(v).trim());
+    if (!Number.isInteger(x) || x < 10 || x > 720) throw new Error('Ödenmemiş borç süresi 10–720 dk arası tam sayı olmalı.');
+    return x;
+  }
+
+  return { sozSatiri, nakitSatirlari, nakitEsikOku, nakitHatirlatmaOku, nakitCozumOku, nakitKurye, notListesiOku, NOT_VARSAYILAN, pushDurumu, no, varisGecikti, fisResimAdresi, fisDosyaAdi, posEsik, posSatirlari, isletmePoslari, posAdiOku, posEsikOku, POS_KAYIT_TUR, POS_ESIK_VARSAYILAN, bildirimYolu, denemeSonucu, DENEME_BEKLE_SN, cihazAdi, hashSiparis, b64uBayt, VARSAYILAN_SINIR, esc, tl, saat, tarihSaat, dk, KAYNAK, ODEME, KASA_TUR, alarmdakiler, siparisDurumu, kuryeDurumu, ozetSayilari,
+    telefonDuzelt, sinirOku, tutarOku, sureOku, sureYaz, hataMetni, kurulmamisMi, kisaAdOner,
+    ESIK, esikler, dkTam, onceYaz, sinyalDurumu, gecikme, sorunNedeni, sutunlar, geriAlinabilir, atanabilir, devredilebilir, atamaUyarilari, siparisIslemHatasi };
+})();
+// ---- KURYELER ÇEKİRDEK SONU ----
+
+(function () {
+  'use strict';
+  const K = KY, e = K.esc;
+  const YENILEME_MS = 10000, KURULMAMIS_MS = 5 * 60 * 1000, SES_TEKRAR_MS = 20000;
+  let veri = null, zaman = null, yukleniyor = false, kurulmamis = false, sekme = 'siparisler';
+  let sonSes = 0, sesBaglam = null;
+  const susturulan = new Set();
+  const g = (id) => document.getElementById(id);
+
+  async function rpc(fn, args) {
+    const { data: d, error } = await db.rpc(fn, args || {});
+    if (error) throw new Error(error.message || String(error));
+    return d;
+  }
+  const mesaj = (metin, tur = 'err') => { const m = g('kyMsg'); m.textContent = metin || ''; m.className = `msg ${tur}` + (metin ? '' : ' hidden'); };
+
+  // ---------------------------------------------------------------- ses (Web Audio; dosya yok)
+  function sesHazirla() {
+    try { sesBaglam = sesBaglam || new (window.AudioContext || window.webkitAudioContext)(); if (sesBaglam.state === 'suspended') sesBaglam.resume(); } catch (x) { sesBaglam = null; }
+  }
+  document.addEventListener('click', sesHazirla, { capture: true });
+  function sesCal() {
+    window.__kySes = (window.__kySes || 0) + 1; // test sayacı
+    sonSes = Date.now();
+    try {
+      sesHazirla();
+      if (!sesBaglam) return;
+      const t0 = sesBaglam.currentTime;
+      for (let i = 0; i < 3; i++) {
+        const o = sesBaglam.createOscillator(), v = sesBaglam.createGain();
+        o.type = 'square'; o.frequency.value = i % 2 ? 660 : 880;
+        v.gain.setValueAtTime(0.0001, t0 + i * 0.35);
+        v.gain.exponentialRampToValueAtTime(0.25, t0 + i * 0.35 + 0.02);
+        v.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.35 + 0.3);
+        o.connect(v).connect(sesBaglam.destination);
+        o.start(t0 + i * 0.35); o.stop(t0 + i * 0.35 + 0.32);
+      }
+    } catch (x) { /* ses çalınamazsa kırmızı uyarı yine görünür */ }
+  }
+
+  // 07.11: ortak defter kurulu mu (özellik düğmesi "Kurye uygulaması defteri" buna göre görünür); değişince liste yeniden çizilir
+  function defterKuruluYaz(v) {
+    if (window.defterKurulu === v) return;
+    window.defterKurulu = v;
+    try { if (typeof render === 'function' && data) render(); } catch (e) { /* liste sonraki yenilemede çizilir */ }
+  }
+
+  // ---------------------------------------------------------------- veri
+  async function yukle() {
+    if (yukleniyor) return;
+    yukleniyor = true;
+    try {
+      veri = await rpc('defter_admin_ozet');
+      // Nakit borcu (08.11): ayrı okuma; merkezde yoksa (SQL çalışmamış) kutu ve ayar görünmez
+      veri.nakit = await rpc('defter_admin_nakit_borclar').catch(() => null);
+      kurulmamis = false;
+      defterKuruluYaz(true);
+      $('tabCourier').classList.remove('hidden');
+      mesaj('');
+      ciz();
+      g('kyGuncelleme').textContent = 'Son güncelleme ' + new Date().toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul' });
+    } catch (x) {
+      if (K.kurulmamisMi(x)) {
+        kurulmamis = true; veri = null;
+        defterKuruluYaz(false);
+        g('kyKurulmamis').classList.remove('hidden');
+        g('kyIcerik').classList.add('hidden');
+        alarmCiz([]);
+        // 06.11 (birleşik panel): canlıda ortak defter SQL'i yoksa "Kuryeler" sekmesi gizli; o sekmedeysek ana listeye dön
+        $('tabCourier').classList.add('hidden');
+        if (!$('courierView').classList.contains('hidden')) showTab('inst');
+      } else mesaj(K.hataMetni(x) + (veri ? ' Ekrandaki bilgiler eski olabilir.' : ''));
+    } finally {
+      yukleniyor = false;
+      clearTimeout(zaman);
+      zaman = setTimeout(yukle, kurulmamis ? KURULMAMIS_MS : YENILEME_MS);
+    }
+  }
+  window.kyBaslat = () => { clearTimeout(zaman); yukle(); };
+  window.kyYenile = () => yukle();
+
+  // ---------------------------------------------------------------- alarm (bütün sekmelerde görünür)
+  function alarmCiz(liste) {
+    const kutu = g('kyUyari'), rozet = g('kyRozet');
+    rozet.textContent = liste.length ? String(liste.length) : '';
+    rozet.classList.toggle('hidden', !liste.length);
+    if (!liste.length) { kutu.classList.add('hidden'); kutu.innerHTML = ''; return; }
+    const simdi = new Date();
+    kutu.innerHTML = `<b>⚠ Kimse almadı (${liste.length}):</b> ` +
+      liste.map((o) => `${e(o.dukkan)} ${e(K.KAYNAK[o.kaynak] || o.kaynak)} ${e(K.no(o))} · ${K.dk(o.olusturma, simdi)} dk`).join(', ') +
+      ` <span class="ky-uyari-dugmeler"><button type="button" id="kyGit">Siparişlere git</button>` +
+      `<button type="button" id="kySustur">Sesi sustur</button></span>`;
+    kutu.classList.remove('hidden');
+    g('kyGit').onclick = () => { showTab('courier'); altSekme('siparisler'); };
+    g('kySustur').onclick = () => { liste.forEach((o) => susturulan.add(o.id)); g('kySustur').disabled = true; };
+    g('kySustur').disabled = liste.every((o) => susturulan.has(o.id));
+    const sesli = liste.filter((o) => !susturulan.has(o.id));
+    const yeni = sesli.some((o) => !alarmCiz.gorulen.has(o.id));
+    liste.forEach((o) => alarmCiz.gorulen.add(o.id));
+    if (sesli.length && (yeni || Date.now() - sonSes >= SES_TEKRAR_MS)) sesCal();
+  }
+  alarmCiz.gorulen = new Set();
+
+  // ---------------------------------------------------------------- çizim
+  function ciz() {
+    if (!veri) return;
+    g('kyKurulmamis').classList.add('hidden');
+    g('kyIcerik').classList.remove('hidden');
+    const simdi = new Date();
+    const o = K.ozetSayilari(veri);
+    const kut = (sayi, ad, uyari, k) => `<div class="ky-kutu${uyari ? ' uyari' : ''}" data-ozet="${k}"><b>${sayi}</b><span>${ad}</span></div>`;
+    g('kyOzet').innerHTML =
+      kut(o.bekleyen, o.alarm ? `Bekleyen · ${o.alarm} tanesini kimse almadı` : 'Bekleyen sipariş', o.alarm > 0, 'bekleyen') +
+      kut(o.yolda, 'Kuryede', false, 'yolda') +
+      kut(o.teslim, 'Teslim (12 saat)', false, 'teslim') +
+      kut(o.mesaide, 'Mesaide kurye' + (o.kilitli ? ` · ${o.kilitli} kilitli` : '') + (o.sessiz ? ` · ${o.sessiz} telefon sessiz` : ''), o.kilitli > 0 || o.sessiz > 0, 'mesaide') +
+      kut(K.tl(o.nakit), 'Kuryelerin işletmelere nakit borcu' + (o.nakitAsan ? ` · ${o.nakitAsan} kurye sınırı / süreyi aştı` : '') + (o.nakitItiraz ? ` · ${o.nakitItiraz} anlaşmazlık` : ''),
+        o.nakitAsan > 0 || o.nakitItiraz > 0, 'nakit');
+    cizSiparisler(simdi); cizKuryeler(); cizKasa(); cizAyarlar(); cizEsikler(); cizVaris(); cizNotAyar(); cizFisAyar(); cizPos(); cizPosAyar(); cizNakit(); cizNakitAyar(); cizBildirim();
+    alarmCiz(K.alarmdakiler(veri));
+    bekleyeniAc();
+  }
+  const sureli = (t, once) => (t ? `${K.saat(t)}${K.dk(once, t) != null ? `<span class="ky-alt-satir">+${K.dk(once, t)} dk</span>` : ''}` : '');
+
+  // Dört sütun: Havuzda / Kuryede / Alındı / Sorunlu; kartta "Elle ata" (havuzda) ve "Havuza geri al" (kuryede / restoranda)
+  function cizSutunlar(simdi) {
+    const s = K.sutunlar(veri, simdi);
+    const kart = (o) => {
+      const d = K.siparisDurumu(o, simdi);
+      return `<div class="ky-skart" data-ky-siparis="${e(o.id)}">
+        <b>${e(o.dukkan)}</b> · ${e(K.no(o))}<br>${e(o.mahalle || '-')} · ${K.tl(o.tutar)}
+        <br>${o.sorun ? `<span class="ky-sorun">${e(o.sorun)}</span>` : e(d.metin)}${o.kurye ? ` · ${e(o.kurye)}` : ''}${K.sozSatiri(o) ? ` · ${e(K.sozSatiri(o))}` : ''}
+        ${K.atanabilir(o) ? '<br><button type="button" data-ky-siparis-islem="ata">Elle ata</button>' : ''}
+        ${K.geriAlinabilir(o) ? '<br><button type="button" data-ky-siparis-islem="geri">Havuza geri al</button>' : ''}
+        ${K.devredilebilir(o) ? '<br><button type="button" data-ky-siparis-islem="devret">Kuryeye devret</button>' : ''}
+      </div>`;
+    };
+    const sutun = (ad, l, sinif = '') => `<div class="ky-sutun ${sinif}"><h4><span>${ad}</span><span>${l.length}</span></h4>${l.map(kart).join('') || '<div class="muted">—</div>'}</div>`;
+    g('kySutunlar').innerHTML = sutun('Havuzda', s.havuzda) + sutun('Kuryede', s.kuryede) + sutun('Alındı', s.alindi) + sutun('Sorunlu', s.sorunlu, 'sorunlu');
+  }
+
+  function elleAta(o) {
+    const kuryeler = (veri.kuryeler || []).filter((k) => k.aktif);
+    if (!kuryeler.length) return mesaj('Aktif kurye yok.');
+    const secenek = (k) => {
+      const u = K.atamaUyarilari(k);
+      return `<option value="${e(k.id)}">${e(k.kisa_ad)} · ${k.aktif_paket}/${k.paket_siniri || K.VARSAYILAN_SINIR}${u.length ? ' · ⚠ ' + e(u.join(', ')) : ''}</option>`;
+    };
+    pencere({ baslik: `Elle ata: ${o.dukkan} ${K.no(o)}`, tamam: 'Ata',
+      html: `<label>Kurye<select name="kurye">${kuryeler.map(secenek).join('')}</select></label>
+        <label>Not <span class="muted">isteğe bağlı, kayda geçer</span><input name="neden" maxlength="200" autocomplete="off" /></label>
+        <label class="chk"><input type="checkbox" name="yineDe" /> Uyarı olsa da ata (paket sınırı aşılabilir)</label>
+        <p class="muted">Atama kayda geçer (yönetici e-postası). Sınır aşılırsa ayrıca "sınır aşıldı" kaydı düşer.</p>`,
+      gonder: async (kap) => {
+        const k = kuryeler.find((x) => x.id === deger(kap, 'kurye'));
+        const u = K.atamaUyarilari(k);
+        if (u.length && !kap.querySelector('[name="yineDe"]').checked) throw kh(`${k.kisa_ad}: ${u.join(', ')}. Yine de atamak için kutuyu işaretleyin.`);
+        const r = await rpc('defter_admin_siparis_ata', { p_siparis: o.id, p_kurye: k.id, p_neden: deger(kap, 'neden').trim() || null });
+        const h = K.siparisIslemHatasi(r);
+        if (h) { await yukle(); throw kh(h); }
+        await yukle();
+        return () => mesaj(`${o.dukkan} ${K.no(o)} → ${k.kisa_ad}${(r.uyarilar || []).length ? ` (${r.aktif}/${r.sinir}; kayda geçti)` : ''}.`, 'ok');
+      } });
+  }
+  // Yolda paket değişimi: kuryesini sadece yönetici değiştirir, durum "Paket alındı" kalır; eski kuryeye "artık sende değil",
+  // yeni kuryeye "sana devredildi" (tam ekran + sesli). Sınır doluysa elle atamadaki gibi onay.
+  function devret(o) {
+    const kuryeler = (veri.kuryeler || []).filter((k) => k.aktif && k.id !== o.kurye_id);
+    if (!kuryeler.length) return mesaj('Devredilecek başka aktif kurye yok.');
+    const secenek = (k) => {
+      const u = K.atamaUyarilari(k);
+      return `<option value="${e(k.id)}">${e(k.kisa_ad)} · ${k.aktif_paket}/${k.paket_siniri || K.VARSAYILAN_SINIR}${u.length ? ' · ⚠ ' + e(u.join(', ')) : ''}</option>`;
+    };
+    pencere({ baslik: `Kuryeye devret: ${o.dukkan} ${K.no(o)}`, tamam: 'Devret',
+      html: `<p>Paket şu an <b>${e(o.kurye || '-')}</b> kuryesinde (paket alındı). Durum aynı kalır, yeni kurye teslim eder.</p>
+        <label>Yeni kurye<select name="kurye">${kuryeler.map(secenek).join('')}</select></label>
+        <label>Not <span class="muted">isteğe bağlı, kayda geçer</span><input name="neden" maxlength="200" autocomplete="off" /></label>
+        <label class="chk"><input type="checkbox" name="yineDe" /> Uyarı olsa da devret (paket sınırı aşılabilir)</label>
+        <p class="muted">İki kuryeye de sesli bildirim gider. Devir kayda geçer (yönetici, eski ve yeni kurye, zaman).</p>`,
+      gonder: async (kap) => {
+        const k = kuryeler.find((x) => x.id === deger(kap, 'kurye'));
+        const u = K.atamaUyarilari(k);
+        if (u.length && !kap.querySelector('[name="yineDe"]').checked) throw kh(`${k.kisa_ad}: ${u.join(', ')}. Yine de devretmek için kutuyu işaretleyin.`);
+        const r = await rpc('defter_admin_devret', { p_siparis: o.id, p_kurye: k.id, p_neden: deger(kap, 'neden').trim() || null });
+        const h = K.siparisIslemHatasi(r);
+        if (h) { await yukle(); throw kh(h); }
+        await yukle();
+        return () => mesaj(`${o.dukkan} ${K.no(o)}: ${o.kurye || '-'} → ${k.kisa_ad}${(r.uyarilar || []).length ? ` (${r.aktif}/${r.sinir}; kayda geçti)` : ''}.`, 'ok');
+      } });
+  }
+  function geriAl(o) {
+    pencere({ baslik: `Havuza geri al: ${o.dukkan} ${K.no(o)}`, tamam: 'Geri al',
+      html: `<p><b>${e(o.kurye || '-')}</b> kuryesinden alınıp havuza döner; diğer kuryelere yeniden duyurulur.</p>
+        <label>Neden <span class="muted">isteğe bağlı, kayda geçer</span><input name="neden" maxlength="200" autocomplete="off" /></label>`,
+      gonder: async (kap) => {
+        const r = await rpc('defter_admin_geri_al', { p_siparis: o.id, p_neden: deger(kap, 'neden').trim() || null });
+        const h = K.siparisIslemHatasi(r);
+        if (h) { await yukle(); throw kh(h); }
+        await yukle();
+        return () => mesaj(`${o.dukkan} ${K.no(o)} havuza geri alındı.`, 'ok');
+      } });
+  }
+
+  function cizSiparisler(simdi) {
+    cizSutunlar(simdi);
+    const gizle = g('kyBitenGizle').checked;
+    const liste = (veri.siparisler || []).filter((s) => !gizle || (s.durum !== 'teslim' && s.durum !== 'iptal'));
+    g('kyTabloSiparis').querySelector('tbody').innerHTML = liste.map((s) => {
+      const d = K.siparisDurumu(s, simdi);
+      return `<tr data-siparis="${e(s.id)}" class="${d.uyari ? 'ky-satir-uyari' : ''}${s.durum === 'iptal' ? ' ky-soluk' : ''}">
+        <td>${K.saat(s.olusturma)}</td><td>${e(s.dukkan)}</td>
+        <td>${e(K.KAYNAK[s.kaynak] || s.kaynak)}<span class="ky-alt-satir" title="${e(s.kaynak_no)}">${e(K.no(s))}</span></td>
+        <td>${e(s.mahalle || '-')}</td><td class="num">${K.tl(s.tutar)}</td>
+        <td>${e(K.ODEME[s.odeme] || s.odeme)}${s.fis_zorunlu ? `<span class="ky-alt-satir">${s.fis_alindi ? 'fiş ✓' : 'fiş yok'}</span>` : ''}</td>
+        <td><span class="ky-rozet-d ${d.sinif}">${e(d.metin)}</span></td>
+        <td>${e(s.kurye || '-')}${s.birakma_sayisi ? `<span class="ky-alt-satir">bırakıldı ×${s.birakma_sayisi}</span>` : ''}</td>
+        <td>${sureli(s.alindi_zamani, s.olusturma)}</td><td>${sureli(s.dukkandan_alindi_zamani, s.alindi_zamani)}</td>
+        <td>${s.iptal_zamani ? K.saat(s.iptal_zamani) + '<span class="ky-alt-satir">iptal</span>' : sureli(s.teslim_zamani, s.dukkandan_alindi_zamani)}</td>
+      </tr>`;
+    }).join('');
+    g('kySiparisBos').classList.toggle('hidden', liste.length > 0);
+  }
+
+  const dukkanAdi = (id) => ((veri.dukkanlar || []).find((d) => d.id === id) || {}).ad || '?';
+  function cizKuryeler() {
+    const hepsi = veri.kuryeler || [];
+    const liste = hepsi.filter((k) => k.aktif || g('kyPasifGoster').checked);
+    g('kyTabloKurye').querySelector('tbody').innerHTML = liste.map((k) => {
+      const d = K.kuryeDurumu(k, veri);
+      const sn = K.sinyalDurumu(k, veri);
+      const dkn = (k.dukkanlar || []).map(dukkanAdi).map(e).join(', ') || '<span class="ky-kirmizi-yazi">Atanmamış</span>';
+      return `<tr data-kurye="${e(k.id)}" class="${k.aktif ? '' : 'ky-soluk'}${d.sessiz ? ' ky-satir-uyari' : ''}">
+        <td><b>${e(k.kisa_ad)}</b><span class="ky-alt-satir">${e(k.ad)}</span></td><td>…${e(k.tel_son4)}</td>
+        <td><span class="ky-rozet-d ${d.sinif}">${e(d.metin)}</span>${k.aktif && (k.mesaide || k.son_sinyal) ? `<span class="ky-alt-satir ky-sinyal${sn.sessiz ? ' ky-kirmizi-yazi' : ''}">${e(sn.metin)}</span>` : ''}</td>
+        <td class="${d.dolu ? 'ky-kirmizi-yazi' : ''}">${k.aktif_paket} / ${d.sinir}${k.paket_siniri ? '' : '<span class="ky-alt-satir">varsayılan</span>'}</td>
+        ${(() => { const nk = K.nakitKurye(veri, k.id); return `<td class="num ${d.nakitAsti ? 'ky-kirmizi-yazi' : ''}">${veri.nakit ? K.tl(nk.borc) : '-'}${nk.esikAsildi ? '<span class="ky-alt-satir">sınırı aştı</span>' : ''}${nk.sureAsildi ? '<span class="ky-alt-satir">süre geçti</span>' : ''}${nk.itiraz > 0 ? `<span class="ky-alt-satir ky-turuncu-yazi">${K.tl(nk.itiraz)} anlaşmazlık</span>` : ''}</td>`; })()}
+        <td>${dkn}</td>
+        <td>${k.cihaz ? `${k.cihaz} telefon${k.son_gorulme ? `<span class="ky-alt-satir">son: ${K.tarihSaat(k.son_gorulme)}</span>` : ''}${(() => { const y = K.bildirimYolu(k); return y ? `<span class="ky-alt-satir ky-bildirim-yolu${y.uyari ? ' ky-turuncu-yazi' : ''}">${e(y.metin)}</span>` : ''; })()}${(() => { const dn = K.denemeSonucu(k.son_deneme, k.mesaide, veri.zaman); return dn ? `<span class="ky-alt-satir ky-deneme ky-deneme-${dn.sinif}${dn.sinif === 'kirmizi' ? ' ky-kirmizi-yazi' : dn.sinif === 'turuncu' ? ' ky-turuncu-yazi' : ''}">Deneme ${K.saat(k.son_deneme.olusturma)}: ${e(dn.metin)}</span>` : ''; })()}` : '<span class="ky-alt-satir">girilmedi</span>'}</td>
+        <td><div class="actions">
+          <button type="button" data-ky-islem="duzenle">Düzenle</button>
+          ${k.aktif ? '<button type="button" data-ky-islem="kod">Giriş kodu</button>' : ''}
+          ${k.aktif && k.cihaz ? '<button type="button" data-ky-islem="deneme" title="Kuryenin telefonuna deneme bildirimi; hangi yoldan kaç saniyede ulaştığı burada görünür">Deneme bildirimi</button>' : ''}
+          ${k.kilitli ? '<button type="button" data-ky-islem="kilit">Kilidi aç</button>' : ''}
+        </div></td></tr>`;
+    }).join('');
+    g('kyKuryeBos').classList.toggle('hidden', hepsi.length > 0);
+  }
+
+  // 09.11: sadece hareketler (kapıda toplanan nakit kaydı; eski teslim satırları silinmez). "Teslim al" kalktı.
+  function cizKasa() {
+    const kasa = veri.kasa || [];
+    g('kyTabloKasa').querySelector('tbody').innerHTML = kasa.map((h) => `<tr data-kasa="${e(h.id)}">
+      <td>${K.tarihSaat(h.zaman)}</td><td>${e(h.kurye)}</td><td>${e(K.KASA_TUR[h.tur] || h.tur)}</td>
+      <td class="num ${Number(h.tutar) < 0 ? 'ky-eksi' : 'ky-arti'}">${Number(h.tutar) > 0 ? '+' : ''}${K.tl(h.tutar)}</td>
+      <td>${h.kaynak_no ? '#' + e(h.kaynak_no) : '-'}</td><td>${e(h.aciklama || '')}</td>
+      <td>${h.onaylayan ? e(h.onaylayan) : `<span class="ky-alt-satir">${h.kaydeden === 'sistem' ? 'teslimde otomatik' : e(h.kaydeden || '')}</span>`}</td></tr>`).join('');
+    g('kyKasaBos').classList.toggle('hidden', kasa.length > 0);
+  }
+
+  // ---------------------------------------------------------------- ayarlar (yükseltme süreleri)
+  const ADIMLAR = [
+    ['tekrar', '1. Aynı kuryelere tekrar çal', 'O dükkâna atanmış uygun kuryelere bildirim yeniden gider. Sonra sipariş alınana kadar aşağıdaki aralıkla yeniden çalar (diğer kuryelere açıldıktan ve yöneticiye düştükten sonra da; en çok 30 dk). Her çalma telefonda en çok 30 sn.'],
+    ['genis', '2. Diğer kuryelere de gönder', 'O dükkâna atanmamış ama mesaide, kilitsiz, fiş beklemeyen ve paket sınırı dolmamış kuryelere de gider; onlar da alabilir.'],
+    ['yonetici', '3. Yöneticiye uyarı', 'Bu panelde sipariş kırmızı olur ve sesli uyarı çalar (panel açıkken).'],
+  ];
+  let ayarSirket = 'varsayilan', ayarDuzenleniyor = false;
+  function cizAyarlar() {
+    if (ayarDuzenleniyor) return; // yazarken 10 sn'lik yenileme formu ezmesin
+    const liste = veri.ayarlar || [];
+    const a = liste.find((x) => x.sirket === ayarSirket) || liste[0];
+    if (!a) { g('kyAyarForm').innerHTML = '<p class="muted">Ayar satırı yok.</p>'; return; }
+    ayarSirket = a.sirket;
+    g('kyAyarForm').innerHTML =
+      (liste.length > 1 ? `<label>Kurye şirketi <select id="kyAyarSirket">${liste.map((x) => `<option value="${e(x.sirket)}" ${x.sirket === a.sirket ? 'selected' : ''}>${e(x.sirket)}</option>`).join('')}</select></label>` : '') +
+      ADIMLAR.map(([k, ad, acik]) => `<div class="ky-adim">
+        <label class="chk"><input type="checkbox" id="kyA_${k}_acik" ${a[k + '_acik'] ? 'checked' : ''} /> <b>${ad}</b></label>
+        <label class="ky-sure">Sipariş geldikten <input type="text" id="kyA_${k}_sn" value="${e(K.sureYaz(a[k + '_sn']))}" autocomplete="off" /> sonra</label>
+        ${k === 'tekrar' ? `<label class="ky-sure">Sonra her <input type="text" id="kyA_cal_aralik_sn" value="${e(K.sureYaz(a.cal_aralik_sn ?? 120))}" autocomplete="off" /> aralıkla yeniden çal</label>` : ''}
+        <div class="muted">${acik}</div></div>`).join('') +
+      `<div class="muted">Süreler 30 sn ile 15 dk arası; saniye (90), dk:sn (1:30) ya da "2 dk" yazılabilir. Siparişi bir kurye alınca adımlar durur, bırakırsa baştan başlar.</div>
+      <div class="actions" style="margin-top:10px"><button type="button" class="primary" id="kyAyarKaydet">Kaydet</button></div>
+      <div class="muted" id="kyAyarSon">${a.guncelleyen ? `Son değişiklik: ${e(a.guncelleyen)} · ${K.tarihSaat(a.guncelleme)}` : 'Varsayılan ayarlar (1 dk / 2 dk / 3 dk; sonra her 2 dk)'}</div>
+      <div id="kyAyarMsg" class="msg hidden"></div>`;
+    g('kyAyarForm').oninput = () => { ayarDuzenleniyor = true; };
+    if (g('kyAyarSirket')) g('kyAyarSirket').onchange = (x) => { ayarSirket = x.target.value; ayarDuzenleniyor = false; cizAyarlar(); };
+    g('kyAyarKaydet').onclick = ayarKaydet;
+  }
+  async function ayarKaydet() {
+    const m = g('kyAyarMsg');
+    const yaz = (t, tur) => { m.textContent = t; m.className = `msg ${tur}`; };
+    const p = {};
+    try {
+      for (const [k, ad] of ADIMLAR) {
+        p[k + '_acik'] = g(`kyA_${k}_acik`).checked;
+        p[k + '_sn'] = K.sureOku(g(`kyA_${k}_sn`).value, ad.replace(/^\d\. /, ''));
+      }
+      if (g('kyA_cal_aralik_sn')) p.cal_aralik_sn = K.sureOku(g('kyA_cal_aralik_sn').value, 'Yeniden çalma aralığı');
+    } catch (x) { return yaz(x.message, 'err'); }
+    g('kyAyarKaydet').disabled = true;
+    try {
+      await rpc('defter_admin_ayar_kaydet', { p, p_sirket: ayarSirket });
+      ayarDuzenleniyor = false;
+      await yukle();
+      const m2 = g('kyAyarMsg');
+      if (m2) { m2.textContent = 'Kaydedildi. Yeni süreler bundan sonraki kontrollerde (en geç 10 sn) geçerli.'; m2.className = 'msg ok'; }
+    } catch (x) { yaz(K.hataMetni(x), 'err'); }
+    finally { if (g('kyAyarKaydet')) g('kyAyarKaydet').disabled = false; }
+  }
+
+  // ---------------------------------------------------------------- gecikme ve telefon eşikleri (03.11; defter.genel_ayarlar)
+  const ESIK_ALANLARI = [
+    ['havuz_esik_dk', 'Havuzda bekleme', 'Kimse almadan bu kadar dakika geçerse.'],
+    ['restoranda_esik_dk', 'Restoranda bekleme', 'Kurye "Restorandayım" dedikten sonra paket bu kadar dakikada alınmazsa.'],
+    ['teslim_esik_dk', 'Paket alındı, teslim yok', '"Paketi aldım"dan sonra bu kadar dakikada teslim edilmezse.'],
+    ['sessiz_esik_dk', 'Telefon sessiz', 'Vardiyadaki kuryenin telefonundan bu kadar dakika sinyal gelmezse (vardiyayı kapatan kurye için uyarı yok).'],
+  ];
+  let esikDuzenleniyor = false;
+  function cizEsikler() {
+    if (esikDuzenleniyor || !g('kyEsikForm')) return;
+    const e2 = K.esikler(veri), ga = veri.genel_ayarlar || {};
+    g('kyEsikForm').innerHTML = ESIK_ALANLARI.map(([k, ad, acik]) => `<div class="ky-adim">
+        <label class="ky-sure"><b>${ad}</b> <input type="number" min="1" max="240" step="1" id="kyE_${k}" value="${e2[k]}" style="width:70px" /> dk</label>
+        <div class="muted">${acik}</div></div>`).join('') +
+      `<div class="actions" style="margin-top:10px"><button type="button" class="primary" id="kyEsikKaydet">Kaydet</button></div>
+      <div class="muted">${ga.guncelleyen ? `Son değişiklik: ${e(ga.guncelleyen)} · ${K.tarihSaat(ga.guncelleme)}` : 'Varsayılan: 5 / 15 / 30 dk, telefon 5 dk'}</div>
+      <div id="kyEsikMsg" class="msg hidden"></div>`;
+    g('kyEsikForm').oninput = () => { esikDuzenleniyor = true; };
+    g('kyEsikKaydet').onclick = esikKaydet;
+  }
+  async function esikKaydet() {
+    const yaz = (t, tur) => { const m = g('kyEsikMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+    const p = {};
+    for (const [k, ad] of ESIK_ALANLARI) {
+      const v = Number(String(g(`kyE_${k}`).value).trim());
+      const [alt, ust] = k === 'sessiz_esik_dk' ? [2, 120] : [1, 240];
+      if (!Number.isInteger(v) || v < alt || v > ust) return yaz(`${ad}: ${alt}–${ust} arası tam dakika yazın.`, 'err');
+      p[k] = v;
+    }
+    g('kyEsikKaydet').disabled = true;
+    try {
+      await rpc('defter_admin_esikler', { p });
+      esikDuzenleniyor = false;
+      await yukle();
+      yaz('Kaydedildi. Yeni eşikler en geç 10 sn içinde geçerli.', 'ok');
+    } catch (x) { yaz(K.hataMetni(x), 'err'); }
+    finally { if (g('kyEsikKaydet')) g('kyEsikKaydet').disabled = false; }
+  }
+
+  // ---------------------------------------------------------------- varış süresi ayarı (05.11; defter.genel_ayarlar)
+  let varisDuzenleniyor = false;
+  function cizVaris() {
+    if (varisDuzenleniyor || !g('kyVarisForm')) return;
+    const ga = veri.genel_ayarlar || {};
+    const sec = Array.isArray(ga.varis_secenekleri) ? ga.varis_secenekleri : [5, 10, 15, 20, 25];
+    g('kyVarisForm').innerHTML = `<div class="ky-adim"><label class="ky-sure"><b>Seçenekler</b> <input id="kyV_sec" value="${e(sec.join(', '))}" style="width:180px" /> dk</label>
+        <div class="muted">2–6 seçenek, virgülle (1–120 dk). Telefonda sonuncunun yanında "+" yazar (ör. "25+").</div></div>
+      <div class="ky-adim"><label class="ky-sure"><b>"Gecikiyorum" adımı</b> <input type="number" min="1" max="30" id="kyV_adim" value="${e(ga.varis_gecikme_adim_dk ?? 5)}" style="width:70px" /> dk</label>
+        <div class="muted">Kurye "+X dk gecikiyorum"a her basışta söz verilen saat bu kadar uzar.</div></div>
+      <div class="ky-adim"><label class="ky-sure"><b>Tolerans</b> <input type="number" min="0" max="60" id="kyV_tol" value="${e(ga.varis_tolerans_dk ?? 5)}" style="width:70px" /> dk</label>
+        <div class="muted">Söz verilen saatten bu kadar sonra kurye dükkâna gelmediyse "Sorunlu: kurye söz verdiği saatte gelmedi".</div></div>
+      <div class="actions" style="margin-top:10px"><button type="button" class="primary" id="kyVarisKaydet">Kaydet</button></div>
+      <div id="kyVarisMsg" class="msg hidden"></div>`;
+    g('kyVarisForm').oninput = () => { varisDuzenleniyor = true; };
+    g('kyVarisKaydet').onclick = varisKaydet;
+  }
+  async function varisKaydet() {
+    const yaz = (t, tur) => { const m = g('kyVarisMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+    const sec = String(g('kyV_sec').value).split(/[,\s]+/).filter(Boolean).map(Number);
+    if (sec.length < 2 || sec.length > 6 || !sec.every((x) => Number.isInteger(x) && x >= 1 && x <= 120)) return yaz('Seçenekler: 2–6 tane, 1–120 arası tam dakika (virgülle).', 'err');
+    if (new Set(sec).size !== sec.length) return yaz('Aynı seçenek iki kez yazılmış.', 'err');
+    const adim = Number(g('kyV_adim').value), tol = Number(g('kyV_tol').value);
+    if (!Number.isInteger(adim) || adim < 1 || adim > 30) return yaz('"Gecikiyorum" adımı 1–30 dk olmalı.', 'err');
+    if (!Number.isInteger(tol) || tol < 0 || tol > 60) return yaz('Tolerans 0–60 dk olmalı.', 'err');
+    g('kyVarisKaydet').disabled = true;
+    try {
+      await rpc('defter_admin_varis_ayar', { p: { secenekler: sec, adim, tolerans: tol } });
+      varisDuzenleniyor = false;
+      await yukle();
+      yaz('Kaydedildi. Telefonlar bir sonraki teklifte yeni seçenekleri alır.', 'ok');
+    } catch (x) { yaz(K.hataMetni(x), 'err'); }
+    finally { if (g('kyVarisKaydet')) g('kyVarisKaydet').disabled = false; }
+  }
+
+  // ---------------------------------------------------------------- fiş fotoğrafı zorunlu (07.11; genel_ayarlar.fis_zorunlu_acik)
+  function cizFisAyar() {
+    const k = g('kyFisForm');
+    if (!k) return;
+    const ga = veri.genel_ayarlar || {};
+    if (typeof ga.fis_zorunlu_acik !== 'boolean') { k.innerHTML = '<p class="muted">Merkezde bu ayar yok (durum geçişleri SQL\'i çalıştırılmamış).</p>'; return; }
+    if (k.dataset.acik === String(ga.fis_zorunlu_acik)) return;
+    k.dataset.acik = String(ga.fis_zorunlu_acik);
+    k.innerHTML = `<div class="ky-adim"><label><input type="checkbox" id="kyFisZorunlu" ${ga.fis_zorunlu_acik ? 'checked' : ''} /> <b>Kartlı siparişte fiş fotoğrafı zorunlu</b></label></div>
+      <div id="kyFisMsg" class="msg hidden"></div>`;
+    g('kyFisZorunlu').onchange = async (ev) => {
+      const yaz = (t, tur) => { const m = g('kyFisMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+      const acik = ev.target.checked;
+      ev.target.disabled = true;
+      try {
+        await rpc('defter_admin_fis_zorunlu', { p_acik: acik });
+        delete k.dataset.acik;
+        await yukle();
+        yaz(acik ? 'Açıldı. Bundan sonra yazılan kartlı siparişlerde fiş fotoğrafı zorunlu.' : 'Kapatıldı. Bundan sonra yazılan siparişlerde fiş fotoğrafı istenmez.', 'ok');
+      } catch (x) { ev.target.checked = !acik; ev.target.disabled = false; yaz(K.hataMetni(x), 'err'); }
+    };
+  }
+
+  // ---------------------------------------------------------------- işletme notları (06.11; genel_ayarlar.isletme_notlari)
+  let notDuzenleniyor = false;
+  function cizNotAyar() {
+    if (notDuzenleniyor || !g('kyNotForm')) return;
+    const l = (veri.genel_ayarlar || {}).isletme_notlari;
+    if (!Array.isArray(l)) { g('kyNotForm').innerHTML = '<p class="muted">Merkezde işletme notları kurulu değil (not SQL\'i çalıştırılmamış).</p>'; return; }
+    g('kyNotForm').innerHTML = `<div class="ky-adim"><label><b>Notlar</b> (her satıra bir tane, en çok 6)<br>
+        <textarea id="kyNotListe" rows="4" style="width:260px">${e(l.join('\n'))}</textarea></label>
+        <div class="actions" style="margin-top:6px"><button type="button" class="primary" id="kyNotKaydet">Kaydet</button></div></div>
+      <div id="kyNotMsg" class="msg hidden"></div>`;
+    g('kyNotListe').oninput = () => { notDuzenleniyor = true; };
+    g('kyNotKaydet').onclick = async () => {
+      const yaz = (t, tur) => { const m = g('kyNotMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+      let liste;
+      try { liste = K.notListesiOku(g('kyNotListe').value); } catch (x) { return yaz(x.message, 'err'); }
+      g('kyNotKaydet').disabled = true;
+      try {
+        await rpc('defter_admin_isletme_not_ayar', { p_liste: liste });
+        notDuzenleniyor = false; await yukle();
+        yaz('Kaydedildi. Programlar yeni listeyi en geç 15 sn içinde alır.', 'ok');
+      } catch (x) { yaz(K.hataMetni(x), 'err'); }
+      finally { if (g('kyNotKaydet')) g('kyNotKaydet').disabled = false; }
+    };
+  }
+
+  // ---------------------------------------------------------------- POS cihazları (06.11; defter.isletme_poslari / pos_hareketleri)
+  // Kutu: işletme · cihaz · kimde · ne zamandır · sipariş(ler); eşik aşıldıysa kırmızı. "Düzelt": yanlış "kuryede" kaydını not ile kapatır.
+  // Eski merkezde (POS SQL'i yok) kutu ve ayar görünmez.
+  function cizPos() {
+    const var_ = Array.isArray(veri.poslar);
+    g('kySkPos').classList.toggle('hidden', !var_);
+    if (!var_) return;
+    const l = K.posSatirlari(veri);
+    g('kyTabloPos').querySelector('tbody').innerHTML = l.map((p) => `<tr data-ky-pos="${e(p.acilis_id)}" class="${p.kirmizi ? 'ky-satir-uyari' : ''}">
+        <td>${e(p.dukkan)}</td><td>${e(p.pos)}</td><td><b>${e(p.kurye)}</b></td>
+        <td>${K.saat(p.baslangic)}<span class="ky-alt-satir${p.kirmizi ? ' ky-kirmizi-yazi' : ''}">${e(p.dk)} dk${p.kirmizi ? ' · eşik aşıldı' : ''}</span></td>
+        <td>${e(p.siparisMetni || '-')}</td>
+        <td><button type="button" data-ky-pos-duzelt="${e(p.acilis_id)}" title="Kurye iade edemiyorsa (vardiyası bitmez)">POS iade edildi</button></td></tr>`).join('');
+    g('kyPosBos').classList.toggle('hidden', l.length > 0);
+    g('kyPosAlt').textContent = `Kuryedeki işletme POS'ları · eşik ${K.posEsik(veri)} dk: aşılınca satır kırmızı olur ve yöneticilere bir kez bildirim gider`;
+  }
+  g('kyTabloPos').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-ky-pos-duzelt]');
+    if (!b) return;
+    const p = (veri.poslar || []).find((x) => String(x.acilis_id) === b.dataset.kyPosDuzelt);
+    if (!p) return;
+    pencere({ baslik: `POS iade edildi: ${p.dukkan} · ${p.pos}`, tamam: 'İade edildi olarak işaretle',
+      html: `<p>Kayıtta POS <b>${e(p.kurye)}</b> kuryesinde görünüyor. POS kuryedeyken vardiyası bitmez (karar 07.11). Cihaz işletmeye döndüyse buradan işaretleyin: kim (siz), ne zaman ve neden kayda geçer; kayıt silinmez, değiştirilmez.</p>
+        <label>Neden (zorunlu)<input name="not" maxlength="200" placeholder="ör. cihaz dükkânda, kurye iade etmeyi unuttu" /></label>`,
+      gonder: async (kap) => {
+        const not = deger(kap, 'not').trim();
+        if (not.length < 3) throw kh('Kısa bir not yazın (en az 3 harf).');
+        const r = await rpc('defter_admin_pos_duzelt', { p_acilis: p.acilis_id, p_not: not });
+        if (r && r.sonuc === 'zaten_kapali') { await yukle(); throw kh('Bu POS kaydı zaten kapanmış.'); }
+        await yukle();
+        return () => mesaj(`${p.dukkan} · ${p.pos}: iade edildi olarak işaretlendi.`, 'ok');
+      } });
+  });
+
+  // ---------------------------------------------------------------- Nakit borçları (08.11; defter.nakit_hareketleri)
+  // Kutu: kurye × işletme · borç · onay bekleyen · en eski açık borç; eşik aşıldıysa kırmızı. "Onayla": kuryenin "Parayı verdim"
+  // bildirimini işletme yerine yönetici onaylar (not zorunlu; kim, ne zaman kayda geçer; silinmez).
+  function cizNakit() {
+    const n = veri.nakit;
+    g('kySkBorc').classList.toggle('hidden', !n);
+    if (!n) return;
+    const l = K.nakitSatirlari(n);
+    // 09.11: anlaşmazlık (işletme "almadım / eksik aldım") → "Çöz"; sınır (kurye toplamı) ve süre işaretleri
+    g('kyTabloBorc').querySelector('tbody').innerHTML = l.map((c) => `<tr data-ky-nakit="${e(c.kurye_id)}:${e(c.dukkan_id)}" class="${c.esik_asildi || c.sure_asildi || c.itirazli > 0 ? 'ky-satir-uyari' : ''}">
+        <td><b>${e(c.kurye)}</b>${c.esik_asildi ? `<span class="ky-alt-satir ky-kirmizi-yazi">toplam ${K.tl(c.kurye_toplam)} · sınır aşıldı</span>` : ''}</td><td>${e(c.dukkan)}</td>
+        <td class="num">${c.bakiye < 0 ? `<span class="ky-alt-satir">işletme kuryeye borçlu</span>${K.tl(-c.bakiye)}` : K.tl(c.bakiye)}</td>
+        <td class="num">${c.bekleyen > 0 ? K.tl(c.bekleyen) : '-'}${c.itirazli > 0 ? `<span class="ky-alt-satir ky-turuncu-yazi">${K.tl(c.itirazli)} anlaşmazlık</span>` : ''}</td>
+        <td>${c.dk != null ? `${e(c.dk)} dk` : '-'}${c.sure_asildi ? '<span class="ky-alt-satir ky-kirmizi-yazi">süre geçti</span>' : ''}</td>
+        <td>${(c.odemeler || []).map((o) => o.durum === 'itiraz'
+          ? `<button type="button" class="primary" data-ky-nakit-coz="${e(o.id)}" title="İşletme ${Number(o.alinan) > 0 ? 'eksik aldığını' : 'almadığını'} söyledi">Çöz: ${Number(o.alinan) > 0 ? `${K.tl(o.alinan)} aldı dedi` : 'almadım dedi'} (${K.tl(o.tutar)})</button>`
+          : `<button type="button" data-ky-nakit-onayla="${e(o.id)}" title="İşletme programda onaylayamadıysa">Onayla ${K.tl(o.tutar)}</button>`).join(' ')}</td></tr>`).join('');
+    g('kyBorcBos').classList.toggle('hidden', l.length > 0);
+    g('kyBorcAlt').textContent = `Kapıda nakit siparişte parayı işletmeye sonra verecek kuryelerin borcu (kurye × işletme) · sınır kurye başına toplam ${K.tl(n.esik)}, süre ${Number(n.sure_dk || n.hatirlatma_dk)} dk: aşılınca yöneticilere bir kez bildirim · kayıtlar silinmez`;
+  }
+  // Anlaşmazlık çözümü (09.11): kuryenin işletmeye verdiği kabul edilen tutar (0..bildirilen); kalan kuryenin borcuna döner. Not zorunlu.
+  g('kyTabloBorc').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-ky-nakit-coz]');
+    if (!b || !veri.nakit) return;
+    const c = (veri.nakit.ciftler || []).find((x) => (x.odemeler || []).some((o) => String(o.id) === b.dataset.kyNakitCoz));
+    const o = c && c.odemeler.find((x) => String(x.id) === b.dataset.kyNakitCoz);
+    if (!o) return;
+    const alinan = Number(o.alinan) || 0;
+    pencere({ baslik: `Nakit anlaşmazlığı: ${c.kurye} → ${c.dukkan}`, tamam: 'Kaydet',
+      html: `<p><b>${e(c.kurye)}</b> ${K.saat(o.zaman)}'de "Parayı verdim" dedi (${K.tl(o.tutar)}). <b>${e(c.dukkan)}</b> ${alinan > 0 ? `sadece <b>${K.tl(alinan)}</b> aldığını` : 'parayı <b>almadığını</b>'} söyledi.</p>
+        <p>Kurye ve işletmeyle konuşup kuryenin işletmeye <b>verdiği kabul edilen tutarı</b> yazın. Kalan tutar kuryenin borcu olarak kalır. Kim (siz), ne zaman ve not kayda geçer; kayıt silinmez.</p>
+        <label>Verildiği kabul edilen tutar (TL) <span class="muted">0 – ${K.tl(o.tutar)}</span><input name="tutar" inputmode="decimal" value="${e(String(alinan).replace('.', ','))}" autocomplete="off" /></label>
+        <label>Not (zorunlu)<input name="not" maxlength="200" placeholder="ör. kurye parayı vermemiş, kabul etti" /></label>`,
+      gonder: async (kap) => {
+        const tutar = oku(() => K.nakitCozumOku(deger(kap, 'tutar'), o.tutar));
+        const not = deger(kap, 'not').trim();
+        if (not.length < 3) throw kh('Kısa bir not yazın (en az 3 harf).');
+        const r = await rpc('defter_admin_nakit_coz', { p_odeme: o.id, p_tutar: tutar, p_not: not });
+        if (r && r.sonuc === 'zaten') { await yukle(); throw kh('Bu ödeme zaten çözülmüş.'); }
+        if (r && r.sonuc === 'gecersiz_tutar') throw kh(`Tutar 0 ile ${K.tl(o.tutar)} arası olmalı.`);
+        await yukle();
+        return () => mesaj(`${c.kurye} → ${c.dukkan}: ${K.tl(tutar)} verildi kabul edildi${Number(o.tutar) - tutar > 0 ? `, ${K.tl(Number(o.tutar) - tutar)} kuryenin borcunda kaldı` : ''}.`, 'ok');
+      } });
+  });
+  g('kyTabloBorc').addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-ky-nakit-onayla]');
+    if (!b || !veri.nakit) return;
+    const c = (veri.nakit.ciftler || []).find((x) => (x.odemeler || []).some((o) => String(o.id) === b.dataset.kyNakitOnayla));
+    const o = c && c.odemeler.find((x) => String(x.id) === b.dataset.kyNakitOnayla);
+    if (!o) return;
+    pencere({ baslik: `Nakit ödemesi: ${c.kurye} → ${c.dukkan}`, tamam: `${K.tl(o.tutar)} alındı olarak onayla`,
+      html: `<p><b>${e(c.kurye)}</b> ${K.saat(o.zaman)}'de "Parayı verdim" dedi (${K.tl(o.tutar)}). Normalde işletme JetTakip programında onaylar. İşletmeyle konuştuysanız buradan onaylayın: kim (siz), ne zaman ve not kayda geçer; kayıt silinmez.</p>
+        <label>Not (zorunlu)<input name="not" maxlength="200" placeholder="ör. işletme telefonda parayı aldığını söyledi" /></label>`,
+      gonder: async (kap) => {
+        const not = deger(kap, 'not').trim();
+        if (not.length < 3) throw kh('Kısa bir not yazın (en az 3 harf).');
+        const r = await rpc('defter_admin_nakit_onayla', { p_odeme: o.id, p_not: not });
+        if (r && r.sonuc === 'zaten') { await yukle(); throw kh('Bu ödeme zaten onaylanmış.'); }
+        await yukle();
+        return () => mesaj(`${c.kurye} → ${c.dukkan}: ${K.tl(o.tutar)} onaylandı.`, 'ok');
+      } });
+  });
+  let nakitAyarDuzenleniyor = false;
+  function cizNakitAyar() {
+    if (nakitAyarDuzenleniyor || !g('kyBorcForm')) return;
+    const n = veri.nakit;
+    if (!n) { g('kyBorcForm').innerHTML = '<p class="muted">Merkezde nakit borcu kurulu değil (nakit SQL\'i çalıştırılmamış).</p>'; return; }
+    g('kyBorcForm').innerHTML = `<div class="ky-adim"><label class="ky-sure"><b>Toplam borç sınırı (kurye başına)</b> <input id="kyBorcEsik" value="${e(String(Number(n.esik)).replace('.', ','))}" style="width:90px" /> TL</label>
+        <label class="ky-sure"><b>Ödenmemiş borç süresi</b> <input type="number" min="10" max="720" id="kyBorcHatirlatma" value="${e(n.sure_dk || n.hatirlatma_dk)}" style="width:70px" /> dk</label>
+        <button type="button" id="kyBorcKaydet">Kaydet</button>
+        <div class="muted">Sınır: kuryenin bütün işletmelere toplam borcu bunu geçince (0 = kapalı). Süre: bir işletmeye borcu bu kadar süredir ödenmeyince (120 dk = 2 saat). İkisinde de yöneticilere bir kez bildirim gider, kuryenin telefonu bir kez hatırlatır.</div></div>
+      <div id="kyBorcMsg" class="msg hidden"></div>`;
+  }
+  g('kyBorcForm').addEventListener('input', () => { nakitAyarDuzenleniyor = true; });
+  g('kyBorcForm').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('#kyBorcKaydet');
+    if (!b) return;
+    const yaz = (t, tur) => { const m = g('kyBorcMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+    b.disabled = true;
+    try {
+      const esik = oku(() => K.nakitEsikOku(g('kyBorcEsik').value));
+      const dk = oku(() => K.nakitHatirlatmaOku(g('kyBorcHatirlatma').value));
+      await rpc('defter_admin_nakit_ayar', { p_esik: esik, p_hatirlatma_dk: dk });
+      nakitAyarDuzenleniyor = false; await yukle(); yaz(`Sınır ${K.tl(esik)}, süre ${dk} dk olarak kaydedildi.`, 'ok');
+    } catch (x) { yaz(x.message, 'err'); } finally { b.disabled = false; }
+  });
+
+  let posAyarDuzenleniyor = false;
+  function cizPosAyar() {
+    if (posAyarDuzenleniyor || !g('kyPosForm')) return;
+    if (!Array.isArray(veri.isletme_poslari)) { g('kyPosForm').innerHTML = '<p class="muted">Merkezde POS takibi kurulu değil (POS SQL\'i çalıştırılmamış).</p>'; return; }
+    const dukkanlar = veri.dukkanlar || [];
+    g('kyPosForm').innerHTML = `<div class="ky-adim"><label class="ky-sure"><b>Hatırlatma eşiği</b> <input type="number" min="5" max="240" id="kyPosEsik" value="${e(K.posEsik(veri))}" style="width:70px" /> dk</label>
+        <button type="button" id="kyPosEsikKaydet">Kaydet</button>
+        <div class="muted">POS bu kadar süredir kuryedeyse kuryenin telefonu hatırlatır, satır kırmızı olur, yöneticilere bir kez bildirim gider.</div></div>
+      ${dukkanlar.map((d) => {
+        const l = K.isletmePoslari(veri, d.id);
+        return `<div class="ky-adim" data-ky-pos-dukkan="${e(d.id)}"><b>${e(d.ad)}</b> <span class="muted">${l.filter((p) => p.aktif).length} aktif POS</span>
+          ${l.map((p) => `<div class="row" data-ky-pos-id="${e(p.id)}"><input name="ad" value="${e(p.ad)}" maxlength="40" style="width:200px" />
+            <label class="chk"><input type="checkbox" name="aktif" ${p.aktif ? 'checked' : ''} /> aktif</label>
+            ${p.kuryede ? '<span class="ky-turuncu-yazi">kuryede</span>' : ''}
+            <button type="button" data-ky-pos-kaydet="${e(p.id)}">Kaydet</button></div>`).join('') || '<div class="muted">Henüz cihaz yok (ilk kartlı siparişte "POS 1" açılır).</div>'}
+          <div class="row"><input name="yeni" maxlength="40" placeholder='Yeni cihaz, ör. "POS 2 (Ingenico)"' style="width:200px" />
+            <button type="button" data-ky-pos-ekle="${e(d.id)}">+ POS ekle</button></div></div>`;
+      }).join('')}
+      <div id="kyPosMsg" class="msg hidden"></div>`;
+  }
+  g('kyPosForm').addEventListener('input', () => { posAyarDuzenleniyor = true; });
+  g('kyPosForm').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    const yaz = (t, tur) => { const m = g('kyPosMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+    b.disabled = true;
+    try {
+      if (b.id === 'kyPosEsikKaydet') {
+        const dk = oku(() => K.posEsikOku(g('kyPosEsik').value));
+        await rpc('defter_admin_pos_esik', { p_dk: dk });
+        posAyarDuzenleniyor = false; await yukle(); yaz(`Eşik ${dk} dk olarak kaydedildi.`, 'ok');
+      } else if (b.dataset.kyPosEkle) {
+        const kap = b.closest('[data-ky-pos-dukkan]');
+        const ad = oku(() => K.posAdiOku(kap.querySelector('input[name="yeni"]').value));
+        await rpc('defter_admin_pos_ekle', { p_dukkan: b.dataset.kyPosEkle, p_ad: ad });
+        posAyarDuzenleniyor = false; await yukle(); yaz(`"${ad}" eklendi.`, 'ok');
+      } else if (b.dataset.kyPosKaydet) {
+        const satir = b.closest('[data-ky-pos-id]');
+        const ad = oku(() => K.posAdiOku(satir.querySelector('input[name="ad"]').value));
+        const aktif = satir.querySelector('input[name="aktif"]').checked;
+        const r = await rpc('defter_admin_pos_guncelle', { p_pos: b.dataset.kyPosKaydet, p_ad: ad, p_aktif: aktif });
+        posAyarDuzenleniyor = false; await yukle();
+        yaz(`"${ad}" kaydedildi${!aktif && r && r.kuryede ? ' · cihaz şu an kuryede: iade edilince kullanılmaz' : ''}.`, 'ok');
+      }
+    } catch (x) { yaz(x.kullaniciya ? x.message : K.hataMetni(x), 'err'); }
+    finally { b.disabled = false; }
+  });
+
+  // ---------------------------------------------------------------- alt sekmeler
+  function altSekme(ad) {
+    sekme = ['siparisler', 'kuryeler', 'kasa', 'ayarlar'].includes(ad) ? ad : 'siparisler';
+    document.querySelectorAll('[data-ky-sekme]').forEach((b) => b.classList.toggle('active', b.dataset.kySekme === sekme));
+    for (const [ad2, id] of [['siparisler', 'kySkSiparis'], ['kuryeler', 'kySkKurye'], ['kasa', 'kySkKasa'], ['ayarlar', 'kySkAyar']]) g(id).classList.toggle('hidden', ad2 !== sekme);
+  }
+  window.kyAltSekme = altSekme;
+
+  // ---------------------------------------------------------------- pencere
+  let pencereGonder = null;
+  function pencere({ baslik, html, tamam = 'Kaydet', vazgec = 'Vazgeç', gonder }) {
+    g('kyPBaslik').textContent = baslik;
+    g('kyPIcerik').innerHTML = html;
+    g('kyPTamam').textContent = tamam;
+    g('kyPVazgec').textContent = vazgec;
+    g('kyPVazgec').classList.toggle('hidden', !vazgec);
+    g('kyPMsg').className = 'msg err hidden';
+    pencereGonder = gonder;
+    g('kyPencere').showModal();
+    const ilk = g('kyPIcerik').querySelector('input'); if (ilk) ilk.focus();
+  }
+  const pencereKapat = () => { pencereGonder = null; if (g('kyPencere').open) g('kyPencere').close(); };
+  g('kyPForm').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!pencereGonder) return pencereKapat();
+    const b = g('kyPTamam'); b.disabled = true;
+    try {
+      const sonra = await pencereGonder(g('kyPIcerik'));
+      pencereKapat();
+      if (typeof sonra === 'function') sonra();
+    } catch (x) {
+      g('kyPMsg').textContent = x.kullaniciya ? x.message : K.hataMetni(x);
+      g('kyPMsg').className = 'msg err';
+    } finally { b.disabled = false; }
+  });
+  g('kyPVazgec').onclick = pencereKapat;
+  const kh = (m) => Object.assign(new Error(m), { kullaniciya: true });
+  const deger = (kap, ad) => kap.querySelector(`[name="${ad}"]`).value;
+  const oku = (fn) => { try { return fn(); } catch (x) { throw kh(x.message); } };
+  const dukkanKutulari = (secili) => (veri.dukkanlar || []).length
+    ? `<div class="ky-dukkanlar">${veri.dukkanlar.map((x) => `<label class="chk"><input type="checkbox" name="dukkan" value="${e(x.id)}" ${secili.includes(x.id) ? 'checked' : ''} /> ${e(x.ad)}</label>`).join('')}</div>`
+    : '<p class="muted">Merkezde dükkân yok.</p>';
+  const seciliDukkanlar = (kap) => [...kap.querySelectorAll('input[name="dukkan"]:checked')].map((i) => i.value);
+  async function atamalariYaz(id, once, sonra) {
+    for (const d of sonra.filter((x) => !once.includes(x))) await rpc('defter_admin_ata', { p_kurye: id, p_dukkan: d, p_aktif: true });
+    for (const d of once.filter((x) => !sonra.includes(x))) await rpc('defter_admin_ata', { p_kurye: id, p_dukkan: d, p_aktif: false });
+  }
+  const kuryeAlanlari = (k = {}) => `<label>Ad soyad<input name="ad" maxlength="60" value="${e(k.ad || '')}" autocomplete="off" /></label>
+    <label>Kısa ad <span class="muted">— dükkân ve müşteri bunu görür (ör. Mehmet K.)</span><input name="kisa_ad" maxlength="30" value="${e(k.kisa_ad || '')}" autocomplete="off" /></label>
+    <div class="sform"><label>Paket sınırı <span class="muted">boş = 3</span><input type="text" name="paket_siniri" inputmode="numeric" value="${e(k.paket_siniri || '')}" autocomplete="off" /></label></div>`;
+  // 09.11: kurye başına "nakit eşiği" (merkeze teslim) kalktı; nakit borcu sınırı Ayarlar'da, bütün kuryeler için
+
+  function kodGoster(ad, kod) {
+    pencere({ baslik: `Giriş kodu: ${ad}`, tamam: 'Tamam', vazgec: '', gonder: async () => true,
+      html: `<p>Kuryeye bu kodu verin; JetTakip Kurye uygulamasında girecek.</p><div class="codebig" id="kyGirisKodu">${e(kod)}</div>
+        <p class="muted">Kod <b>24 saat</b> geçerli ve tek kullanımlık. <b>Sadece şimdi görünür</b>; kaybolursa yeni kod üretin. Daha önce giriş yapmış telefonlar çalışmaya devam eder.</p>` });
+  }
+  function yeniKurye() {
+    pencere({ baslik: 'Yeni kurye', tamam: 'Kurye ekle',
+      html: kuryeAlanlari() + `<label>Telefon<input name="telefon" type="tel" placeholder="0555 111 22 33" autocomplete="off" /></label>
+        <label>Çalışacağı dükkânlar</label>${dukkanKutulari([])}
+        <label class="chk"><input type="checkbox" name="kodUret" checked /> Kaydedince giriş kodu üret</label>`,
+      gonder: async (kap) => {
+        const ad = deger(kap, 'ad').trim(), kisa = deger(kap, 'kisa_ad').trim() || K.kisaAdOner(ad);
+        if (ad.length < 2) throw kh('Ad soyad yazılmalı.');
+        const tel = K.telefonDuzelt(deger(kap, 'telefon'));
+        if (!tel) throw kh('Telefon 0555 111 22 33 biçiminde olmalı.');
+        const sinir = oku(() => K.sinirOku(deger(kap, 'paket_siniri')));
+        const dukkanlar = seciliDukkanlar(kap), kodUret = kap.querySelector('[name="kodUret"]').checked;
+        const id = await rpc('defter_admin_kurye_ekle', { p_telefon: tel, p_ad: ad, p_kisa_ad: kisa, p_paket_siniri: sinir, p_nakit_esigi: null });
+        let kod = null;
+        try {
+          await atamalariYaz(id, [], dukkanlar);
+          if (kodUret) kod = await rpc('defter_admin_kod_uret', { p_kurye: id });
+        } catch (x) {
+          await yukle();
+          return () => mesaj(`${kisa} eklendi ama dükkân ataması / giriş kodu tamamlanamadı (${K.hataMetni(x)}). Düzenle / Giriş kodu ile tamamlayın.`);
+        }
+        await yukle();
+        return () => { if (kod) kodGoster(kisa, kod); };
+      } });
+    const adI = g('kyPIcerik').querySelector('[name="ad"]'), kisaI = g('kyPIcerik').querySelector('[name="kisa_ad"]');
+    adI.addEventListener('input', () => { if (!kisaI.dataset.elle) kisaI.value = K.kisaAdOner(adI.value); });
+    kisaI.addEventListener('input', () => { kisaI.dataset.elle = '1'; });
+  }
+  function duzenle(k) {
+    const once = (k.dukkanlar || []).slice();
+    pencere({ baslik: `Düzenle: ${k.kisa_ad}`,
+      html: kuryeAlanlari(k) + `<label>Çalışacağı dükkânlar</label>${dukkanKutulari(once)}
+        <label class="chk"><input type="checkbox" name="aktif" ${k.aktif ? 'checked' : ''} /> Aktif <span class="muted">(kapatılırsa telefonlardaki giriş kapanır; kurye silinmez)</span></label>`,
+      gonder: async (kap) => {
+        const p = { ad: deger(kap, 'ad').trim(), kisa_ad: deger(kap, 'kisa_ad').trim(),
+          paket_siniri: oku(() => K.sinirOku(deger(kap, 'paket_siniri'))),
+          aktif: kap.querySelector('[name="aktif"]').checked };
+        if (p.ad.length < 2 || !p.kisa_ad) throw kh('Ad soyad ve kısa ad boş olamaz.');
+        if (k.aktif && !p.aktif && k.aktif_paket > 0) throw kh(`Kuryenin üzerinde ${k.aktif_paket} paket var; teslim edince pasif yapın.`);
+        await rpc('defter_admin_kurye_guncelle', { p_kurye: k.id, p });
+        await atamalariYaz(k.id, once, seciliDukkanlar(kap));
+        await yukle();
+        return true;
+      } });
+  }
+  function kodUret(k) {
+    pencere({ baslik: `Giriş kodu üret: ${k.kisa_ad}`, tamam: 'Kod üret',
+      html: '<p>Yeni bir giriş kodu üretilsin mi?</p><p class="muted">Kullanılmamış eski kod geçersiz olur. Daha önce giriş yapmış telefonlar etkilenmez.</p>',
+      gonder: async () => { const kod = await rpc('defter_admin_kod_uret', { p_kurye: k.id }); return () => kodGoster(k.kisa_ad, kod); } });
+  }
+  function kilidiAc(k) {
+    pencere({ baslik: `Kilidi aç: ${k.kisa_ad}`, tamam: 'Kilidi aç',
+      html: `<p>Kilit nedeni: <b>${e(k.kilit_nedeni || '-')}</b></p><label>Açma nedeni<input name="neden" maxlength="200" autocomplete="off" /></label>`,
+      gonder: async (kap) => {
+        const neden = deger(kap, 'neden').trim();
+        if (!neden) throw kh('Neden yazılmalı (kayda geçer).');
+        await rpc('defter_admin_kilit', { p_kurye: k.id, p_kilitli: false, p_neden: neden });
+        await yukle();
+        return true;
+      } });
+  }
+  // Deneme bildirimi (04.11): kuryenin telefonuna; sonuç (FCM / sorgu, kaç sn) satırda görünür. 30 sn boyunca 3 sn'de bir yenilenir.
+  async function denemeGonder(k, dugme) {
+    if (dugme) dugme.disabled = true;
+    try {
+      const r = await rpc('defter_admin_deneme_bildirimi', { p_kurye: k.id });
+      if (r && r.sonuc === 'yok') mesaj('Kurye bulunamadı.');
+      else if (r && r.sonuc === 'bekle') mesaj('Az önce deneme gönderildi; sonucu bekleyin.', 'ok');
+      else mesaj(`${k.kisa_ad}: deneme bildirimi gönderildi${r && !r.mesaide ? ' (kurye vardiyada değil: sadece FCM denenir)' : ''}.`, 'ok');
+      for (let i = 0; i < 11; i++) { await yukle(); if (i < 10) await new Promise((t) => setTimeout(t, 3000)); }
+    } catch (x) {
+      mesaj(K.hataMetni(x));
+    } finally {
+      if (dugme) dugme.disabled = false;
+    }
+  }
+
+  // ---------------------------------------------------------------- yönetici uyarıları: telefon (uygulama) + web bildirimi
+  const swKullanilir = () => 'serviceWorker' in navigator && !!navigator.serviceWorker && 'PushManager' in window && typeof Notification !== 'undefined';
+  const standaloneMi = () => window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  let swKayit = null;
+  async function swHazir() {
+    if (!swKullanilir()) return null;
+    try { swKayit = swKayit || (await navigator.serviceWorker.register('sw.js')); } catch (x) { swKayit = null; }
+    return swKayit;
+  }
+  async function pushOrtami() {
+    // Destek = service worker gerçekten kaydedilebildi (özellik görünse de file:// / gizli pencere gibi yerlerde kayıt olmaz)
+    const r = swKullanilir() ? await swHazir() : null;
+    const destek = !!r;
+    let abone = null;
+    if (r) { try { abone = await r.pushManager.getSubscription(); } catch (x) { abone = null; } }
+    return { destek, ios: /iPhone|iPad/.test(navigator.userAgent), standalone: standaloneMi(), izin: destek ? Notification.permission : 'default', vapid: veri && veri.vapid_acik, abone };
+  }
+  let bildirimCiziliyor = false;
+  async function cizBildirim() {
+    if (!veri || bildirimCiziliyor) return;
+    bildirimCiziliyor = true;
+    try {
+      const o = await pushOrtami();
+      const d = K.pushDurumu(o);
+      const cihazlar = veri.yonetici_cihazlari || [], abonelikler = veri.push_abonelikleri || [];
+      g('kyBildirim').innerHTML = `<div class="ky-adim"><b>Android telefon — JetTakip Kurye uygulaması</b>
+          <div class="muted">Kodu uygulamanın giriş ekranına yazın; uygulama yönetici ekranına geçer, "kimse almadı" uyarısı alarm sesiyle gelir.</div>
+          <div class="actions" style="margin-top:6px"><button type="button" id="kyYonKod">Telefonum için yönetici kodu üret</button></div>
+          ${cihazlar.length ? `<table class="report ky-tablo" id="kyYonCihaz"><tbody>${cihazlar.map((c) => `<tr data-cihaz="${e(c.id)}"><td>${e(c.model || 'Telefon')}<span class="ky-alt-satir">${c.bildirim ? 'bildirim hazır' : '<span class="ky-kirmizi-yazi">bildirim jetonu yok</span>'} · son: ${K.tarihSaat(c.son_gorulme) || '-'}</span></td><td class="num"><button type="button" data-ky-cihaz-kapat="${e(c.id)}">Kapat</button></td></tr>`).join('')}</tbody></table>` : '<div class="muted">Kayıtlı telefon yok.</div>'}
+        </div>
+        <div class="ky-adim"><b>iPhone / bu cihaz — web bildirimi</b>
+          <div class="muted" id="kyPushDurum" data-kod="${e(d.kod)}">${e(d.metin)}</div>
+          <div class="actions" style="margin-top:6px">${d.dugme === 'ac' ? '<button type="button" class="primary" id="kyPushAc">Bu cihazda bildirimleri aç</button>' : d.dugme === 'kapat' ? '<button type="button" id="kyPushKapat">Bu cihazda kapat</button>' : ''}</div>
+          ${abonelikler.length ? `<table class="report ky-tablo" id="kyPushListe"><tbody>${abonelikler.map((a) => `<tr data-abonelik="${e(a.id)}"><td>${e(a.cihaz || 'Tarayıcı')}<span class="ky-alt-satir">${a.son_basari ? 'son bildirim: ' + K.tarihSaat(a.son_basari) : 'henüz bildirim gitmedi'}${a.son_hata ? ' · ' + e(a.son_hata) : ''}</span></td><td class="num"><button type="button" data-ky-push-sil="${e(a.id)}">Kaldır</button></td></tr>`).join('')}</tbody></table>` : ''}
+          <div id="kyBildirimMsg" class="${bildirimMesaji ? 'msg ' + bildirimMesaji.tur : 'msg hidden'}">${bildirimMesaji ? e(bildirimMesaji.t) : ''}</div>
+        </div>`;
+      g('kyYonKod').onclick = yoneticiKodu;
+      if (g('kyPushAc')) g('kyPushAc').onclick = pushAc;
+      if (g('kyPushKapat')) g('kyPushKapat').onclick = pushKapat;
+    } finally { bildirimCiziliyor = false; }
+  }
+  // Mesaj ayrıca saklanır: arkadan gelen yeniden çizim (yukle → cizBildirim) mesajı silmesin
+  let bildirimMesaji = null;
+  const bMsg = (t, tur = 'err') => { bildirimMesaji = { t, tur }; const m = g('kyBildirimMsg'); if (m) { m.textContent = t; m.className = `msg ${tur}`; } };
+  function yoneticiKodu() {
+    pencere({ baslik: 'Yönetici kodu üret', tamam: 'Kod üret',
+      html: '<p>Kendi telefonunuz için yönetici kodu üretilsin mi?</p><p class="muted">Kod 24 saat geçerli, tek kullanımlık. Kullanılmamış eski yönetici kodunuz geçersiz olur; kayıtlı telefonlarınız etkilenmez.</p>',
+      gonder: async () => {
+        const kod = await rpc('defter_admin_yonetici_kod', {});
+        await yukle();
+        return () => pencere({ baslik: 'Yönetici kodu', tamam: 'Tamam', vazgec: '', gonder: async () => true,
+          html: `<p>JetTakip Kurye uygulamasının giriş ekranına bu kodu yazın.</p><div class="codebig" id="kyYonKodu">${e(kod)}</div>
+            <p class="muted">Uygulama "Yönetici" ekranına geçer. Hazırlık ekranındaki bildirim / pil ayarlarını yapın; kimse almayan sipariş uyarısı alarm sesiyle gelir. Bildirime dokununca panelde o sipariş açılır.</p>` });
+      } });
+  }
+  async function pushAc() {
+    try {
+      const r = await swHazir();
+      if (!r) throw kh('Web bildirimi bu cihazda kullanılamıyor.');
+      const izin = await Notification.requestPermission();
+      if (izin !== 'granted') { bMsg('Bildirim izni verilmedi.'); return cizBildirim(); }
+      const abone = (await r.pushManager.getSubscription()) || (await r.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: K.b64uBayt(veri.vapid_acik) }));
+      const j = abone.toJSON ? abone.toJSON() : abone;
+      await rpc('defter_admin_push_kaydet', { p: { endpoint: j.endpoint, keys: j.keys, cihaz: K.cihazAdi(navigator.userAgent, standaloneMi()) } });
+      await yukle();
+      bMsg('Bu cihazda bildirimler açıldı.', 'ok');
+    } catch (x) { bMsg(x.kullaniciya ? x.message : K.hataMetni(x)); }
+  }
+  async function pushKapat() {
+    try {
+      const r = await swHazir();
+      const abone = r ? await r.pushManager.getSubscription() : null;
+      if (abone) { await rpc('defter_admin_push_sil', { p_endpoint: abone.endpoint }); await abone.unsubscribe(); }
+      await yukle();
+      bMsg('Bu cihazda bildirimler kapatıldı.', 'ok');
+    } catch (x) { bMsg(K.hataMetni(x)); }
+  }
+  g('courierView').addEventListener('click', async (ev) => {
+    const c = ev.target.closest('[data-ky-cihaz-kapat]'), p = ev.target.closest('[data-ky-push-sil]');
+    try {
+      if (c) { await rpc('defter_admin_yonetici_cihaz_kapat', { p_cihaz: c.dataset.kyCihazKapat }); await yukle(); }
+      if (p) { await rpc('defter_admin_push_sil', { p_id: Number(p.dataset.kyPushSil) }); await yukle(); }
+    } catch (x) { bMsg(K.hataMetni(x)); }
+  });
+
+  // ---------------------------------------------------------------- bildirimden gelen sipariş (#siparis=<id>)
+  let acilacak = K.hashSiparis(location.hash);
+  function siparisAc(id) {
+    showTab('courier');
+    altSekme('siparisler');
+    document.querySelectorAll('#kyTabloSiparis tr.ky-vurgu').forEach((t) => t.classList.remove('ky-vurgu'));
+    const satir = document.querySelector(`#kyTabloSiparis tr[data-siparis="${id}"]`);
+    if (satir) { satir.classList.add('ky-vurgu'); if (satir.scrollIntoView) satir.scrollIntoView({ block: 'center' }); }
+    siparisDetay(id);
+  }
+  // Sipariş ayrıntısı penceresi (06.11 akşam: sütun kartına ya da tablo satırına tıklayınca da açılır)
+  function siparisDetay(id) {
+    const s = (veri.siparisler || []).find((x) => x.id === id);
+    if (!s) {
+      return pencere({ baslik: 'Sipariş', tamam: 'Tamam', vazgec: '', gonder: async () => true,
+        html: '<p id="kySiparisDetay" data-bulunamadi="1">Bu sipariş son 12 saatin listesinde yok (çok eski ya da silinmiş).</p>' });
+    }
+    const d = K.siparisDurumu(s, new Date());
+    const satirlar = [['Dükkân', e(s.dukkan)], ['Sipariş', `${e(K.KAYNAK[s.kaynak] || s.kaynak)} ${e(K.no(s))}${s.kisa_no ? ` (${e(s.kaynak_no)})` : ''}`], ['Mahalle', e(s.mahalle || '-')],
+      ['Tutar', K.tl(s.tutar)], ['Ödeme', e(K.ODEME[s.odeme] || s.odeme)], ['Durum', `<span class="ky-rozet-d ${d.sinif}">${e(d.metin)}</span>`],
+      ['Geliş', K.saat(s.olusturma)], ['Kurye', e(s.kurye || '-')],
+      ...(s.varis_ilk ? [['Söz verilen varış', `${K.saat(s.varis_ilk)} (${e(s.varis_dk)} dk)${s.varis_gecikme ? ` · +${e(s.varis_gecikme)} dk → ${K.saat(s.varis_hedef)}` : ''}`]] : []),
+      ...(s.restorana_varis ? [['Dükkâna varış', `${K.saat(s.restorana_varis)}${s.varis_ilk ? (s.varis_gec_dk > 0 ? ` · <span class="ky-kirmizi-yazi">${e(s.varis_gec_dk)} dk geç</span>` : ' · zamanında') : ''}`]] : []),
+      ...(s.genisletildi ? [['Herkese açıldı', K.saat(s.genisletildi)]] : []), ...(s.yonetici_uyari ? [['Yönetici uyarısı', K.saat(s.yonetici_uyari)]] : []),
+      ...(s.alindi_zamani ? [['Alındı', K.saat(s.alindi_zamani)]] : []), ...(s.teslim_zamani ? [['Teslim', K.saat(s.teslim_zamani)]] : []),
+      ...(s.pos ? [['POS', `${e(s.pos.ad)} · ${s.pos.acik ? '<span class="ky-turuncu-yazi">kuryede</span>' : 'iade edildi'}`]] : [])];
+    pencere({ baslik: `Sipariş: ${s.dukkan}`, tamam: 'Tamam', vazgec: '', gonder: async () => true,
+      html: `<table class="report" id="kySiparisDetay" data-siparis="${e(s.id)}"><tbody>${satirlar.map(([a, b]) => `<tr><th>${a}</th><td>${b}</td></tr>`).join('')}</tbody></table>
+        ${s.fis_alindi ? '<div id="kyFisFoto" class="muted">Fiş fotoğrafı yükleniyor…</div>' : ''}
+        ${s.pos ? '<div id="kyPosKaydi" class="muted">POS kaydı yükleniyor…</div>' : ''}
+        <div id="kyNotGecmis" class="muted hidden"></div>
+        <p class="muted">Müşteri bilgisi panelde gösterilmez.</p>` });
+    // Fiş fotoğrafı (kapıda kart): ayrı çağrı (büyük), pencere açıkken gelir. Dokununca büyür; "İndir" JPEG kaydeder.
+    if (s.fis_alindi) {
+      rpc('defter_admin_fis_foto', { p_siparis: s.id }).then((r) => {
+        const k = g('kyFisFoto');
+        if (!k) return;
+        const u = r && r.sonuc === 'tamam' ? K.fisResimAdresi(r.veri_base64) : null;
+        if (!u) { k.textContent = r && r.sonuc === 'yok' ? 'Fiş fotoğrafı yok (30 günden eski olabilir).' : 'Fiş fotoğrafı açılamadı.'; return; }
+        k.className = 'ky-fis';
+        k.innerHTML = '<b>Fiş fotoğrafı</b> <span class="muted"></span><img alt="Fiş fotoğrafı" title="Büyütmek için dokunun" /><a></a>';
+        k.querySelector('span').textContent = `${K.saat(r.yuklenme)} · ${r.kurye || ''} · ${Math.round((r.boyut || 0) / 1024)} KB`;
+        const img = k.querySelector('img'); img.src = u; img.onclick = () => img.classList.toggle('buyuk');
+        const a = k.querySelector('a'); a.href = u; a.download = K.fisDosyaAdi(s); a.textContent = 'İndir';
+      }).catch(() => { const k = g('kyFisFoto'); if (k) k.textContent = 'Fiş fotoğrafı alınamadı.'; });
+    }
+    // İşletme notları (06.11): ayrı çağrı; not yoksa ya da merkezde fonksiyon yoksa bölüm görünmez
+    rpc('defter_admin_siparis_notlari', { p_siparis: s.id }).then((l) => {
+      const k = g('kyNotGecmis');
+      if (!k || !Array.isArray(l) || !l.length) return;
+      k.classList.remove('hidden');
+      k.innerHTML = `<b>İşletme notları</b><table class="report"><tbody>${l.map((n) => `<tr><td>${K.saat(n.zaman)}</td><td>${e(n.metin)}</td><td>${e(n.kurye || '')}${n.bildirim ? ` <span class="ky-alt-satir">bildirim: ${e(n.bildirim === 'gonderildi' ? 'gitti' : n.bildirim)}</span>` : ''}</td></tr>`).join('')}</tbody></table>`;
+    }).catch(() => {});
+    // POS kaydı (aldı / aynı POS / iade / düzeltme): ayrı çağrı, pencere açıkken gelir
+    if (s.pos) {
+      rpc('defter_admin_pos_kaydi', { p_siparis: s.id }).then((l) => {
+        const k = g('kyPosKaydi');
+        if (k) k.innerHTML = `<b>POS kaydı</b><table class="report"><tbody>${(l || []).map((h) => `<tr><td>${K.saat(h.zaman)}</td><td>${e(K.POS_KAYIT_TUR[h.tur] || h.tur)}</td><td>${e(h.pos)} · ${e(h.kurye)}${h.notu ? ` · ${e(h.notu)}` : ''}${h.yonetici ? ` <span class="ky-alt-satir">${e(h.yonetici)}</span>` : ''}</td></tr>`).join('')}</tbody></table>`;
+      }).catch(() => { const k = g('kyPosKaydi'); if (k) k.textContent = 'POS kaydı alınamadı.'; });
+    }
+  }
+  function bekleyeniAc() {
+    if (!acilacak || !veri) return;
+    const id = acilacak; acilacak = null;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (x) { /* yok */ }
+    siparisAc(id);
+  }
+  window.addEventListener('hashchange', () => { const id = K.hashSiparis(location.hash); if (id) { acilacak = id; if (veri) bekleyeniAc(); else yukle(); } });
+  if (swKullanilir()) {
+    navigator.serviceWorker.addEventListener('message', (ev) => {
+      const id = ev.data && ev.data.tur === 'siparis_ac' ? K.hashSiparis(new URL(ev.data.url, location.href).hash) : null;
+      if (id) { acilacak = id; yukle(); }
+    });
+    if (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname)) swHazir();
+  }
+  window.kySiparisAc = (id) => { acilacak = id; yukle(); };
+
+  // ---------------------------------------------------------------- olaylar
+  document.querySelectorAll('[data-ky-sekme]').forEach((b) => { b.onclick = () => altSekme(b.dataset.kySekme); });
+  g('kyBitenGizle').onchange = () => veri && cizSiparisler(new Date());
+  g('kyPasifGoster').onchange = () => veri && cizKuryeler();
+  g('kyYeniKurye').onclick = () => veri && yeniKurye();
+  g('courierView').addEventListener('click', (ev) => {
+    const sb = ev.target.closest('[data-ky-siparis-islem]');
+    if (sb && veri) {
+      const o = (veri.siparisler || []).find((x) => x.id === sb.closest('[data-ky-siparis]').dataset.kySiparis);
+      if (o) ({ ata: elleAta, geri: geriAl, devret })[sb.dataset.kySiparisIslem](o);
+      return;
+    }
+    const kart = ev.target.closest('.ky-skart[data-ky-siparis], #kyTabloSiparis tr[data-siparis]');
+    if (kart && veri && !ev.target.closest('button, a, input, select, textarea')) { siparisDetay(kart.dataset.kySiparis || kart.dataset.siparis); return; }
+    const b = ev.target.closest('[data-ky-islem]');
+    if (!b || !veri) return;
+    const k = (veri.kuryeler || []).find((x) => x.id === b.closest('[data-kurye]').dataset.kurye);
+    if (k) ({ duzenle, kod: kodUret, kilit: kilidiAc, deneme: denemeGonder })[b.dataset.kyIslem](k, b);
+  });
+})();
 </script>
 </body>
 </html>
