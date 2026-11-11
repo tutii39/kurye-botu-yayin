@@ -17,12 +17,39 @@
   }
 
   // Telefonda kalıcı tutulanlar: cihaz anahtarı, kısa ad, kuyruk (müşteri bilgisi YOK; fotoğraf gönderilince silinir)
-  const yerel = {
+  // Kayıt adları (11.11): TEST derlemesinde jt_test_..., canlıda jt_... aynen (C.kayitAdi). Kodda hep jt_... yazılır.
+  const yerelHam = {
     al: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
     yaz: (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* yok */ } },
   };
+  const yerel = {
+    al: (k) => yerelHam.al(C.kayitAdi(k, AYAR.ortam)),
+    yaz: (k, v) => yerelHam.yaz(C.kayitAdi(k, AYAR.ortam), v),
+  };
+  // TEST 0.2.4'e kadar jt_ adlarını kullandı (canlı web o zaman yoktu, o kayıtlar TEST'in). TEST'te jt_test_ kaydı yoksa ve
+  // jt_ kaydı başka merkezin değilse jt_test_'e taşınır: TEST'i deneyenin girişi düşmez, jt_ adları canlıya boş kalır.
+  const TUM_KAYITLAR = ['jt_anahtar', 'jt_merkez', 'jt_ad', 'jt_kuyruk', 'jt_rol', 'jt_iptal_goruldu', 'jt_uyari_goruldu', 'jt_pos_soruldu',
+    'jt_sihirbaz_tamam', 'jt_nakit_soruldu', 'jt_zil_tamam', 'jt_tema'];
+  if (AYAR.ortam === 'TEST' && !yerel.al('jt_anahtar') && yerelHam.al('jt_anahtar')) {
+    const m = yerelHam.al('jt_merkez');
+    if (!m || m === AYAR.merkez) {
+      for (const k of TUM_KAYITLAR) {
+        const v = yerelHam.al(k);
+        if (v != null) { yerel.yaz(k, v); yerelHam.yaz(k, null); }
+      }
+    }
+  }
+  // Kaydın merkezi (11.11): TEST (/kurye-test/) ve canlı (/kurye/) aynı alan adında, tarayıcı kayıtları ortak. jt_merkez
+  // kaydın hangi merkeze ait olduğunu söyler; başka merkezin kaydı kullanılmaz ve SİLİNMEZ. jt_merkez'i olmayan eski kayıt bu
+  // merkezin sayılır (bu düzeltmeden önce her derleme tek merkezliydi); merkez onu ilk tanıyınca işaretlenir.
+  const kayitBuMerkezin = () => { const m = yerel.al('jt_merkez'); return !m || m === AYAR.merkez; };
+  const merkezIsaretle = () => { if (!yerel.al('jt_merkez') && yerel.al('jt_anahtar') === anahtar) yerel.yaz('jt_merkez', AYAR.merkez); };
   let anahtar = yerel.al('jt_anahtar');
   let rol = yerel.al('jt_rol') || 'kurye'; // 'kurye' | 'yonetici' (yönetici: panel yöneticisinin uyarı telefonu, sipariş almaz)
+  const OTURUM_KAYITLARI = ['jt_anahtar', 'jt_merkez', 'jt_ad', 'jt_kuyruk', 'jt_rol', 'jt_iptal_goruldu', 'jt_uyari_goruldu', 'jt_pos_soruldu', 'jt_sihirbaz_tamam'];
+  const oturumKayitlariniSil = () => { for (const k of OTURUM_KAYITLARI) yerel.yaz(k, null); };
+  const baskaMerkezKaydi = Boolean(anahtar) && !kayitBuMerkezin();
+  if (baskaMerkezKaydi) { anahtar = null; rol = 'kurye'; }
   const api = () => C.api({ merkez: AYAR.merkez, anahtar: AYAR.anahtar });
   const rpc = (fn, args) => api().rpc(fn, args);
 
@@ -82,9 +109,12 @@
     try {
       const r = await rpc('defter_cihaz_kaydol', { p_kod: kod, p_anahtar: yeniAnahtar, p_bilgi: { surum: AYAR.surum || '', model: navigator.userAgent.slice(0, 60) } });
       if (r && r.sonuc === 'tamam') {
+        // Tarayıcıda başka bir oturumun (ör. başka merkezin) kaydı kaldıysa: kuyruğu vb. bu merkeze gitmesin, üstüne yazılır
+        if (yerel.al('jt_anahtar')) oturumKayitlariniSil();
         anahtar = yeniAnahtar;
         rol = r.rol === 'yonetici' ? 'yonetici' : 'kurye';
         yerel.yaz('jt_anahtar', anahtar);
+        yerel.yaz('jt_merkez', AYAR.merkez);
         yerel.yaz('jt_rol', rol);
         yerel.yaz('jt_ad', r.kisa_ad || '');
         await bildirimKaydi();
@@ -182,8 +212,9 @@
     try {
       if (!webMi() || !window.caches) return;
       const adres = new URL(SW_AYAR.yol, location.href).href;
-      if (!acik) { await caches.delete(SW_AYAR.onbellek); return; }
       const c = await caches.open(SW_AYAR.onbellek);
+      // Önbellek alan adı genelinde ortak: çıkışta sadece bu uygulamanın (bu yolun) satırı silinir, öbür uygulamanınki kalır
+      if (!acik) { await c.delete(adres); return; }
       await c.put(adres, new Response(JSON.stringify({ merkez: AYAR.merkez, anahtar: AYAR.anahtar, cihaz: anahtar }), { headers: { 'content-type': 'application/json' } }));
     } catch (e) { /* depolama yok: deneme "gelmedi" görünür */ }
   }
@@ -280,6 +311,7 @@
       nakit = n;
       saatSapma = C.saatFarki(liste.saat);
       cevrimdisi = false;
+      merkezIsaretle();
     } catch (e) {
       if (e.cevrimdisi) cevrimdisi = true;
       else if (/cihaz tanimli degil/.test(e.message)) return cikis(true);
@@ -1091,6 +1123,7 @@
   async function yenileYonetici() {
     try {
       const o = await rpc('defter_yonetici_ozet', { p_anahtar: anahtar });
+      merkezIsaretle();
       $('kuryeAd').textContent = (o && o.ad) || yerel.al('jt_ad') || '';
       $('yoBekleyen').textContent = String(o.bekleyen);
       $('yoMesaide').textContent = String(o.mesaide);
@@ -1239,7 +1272,11 @@
     webDurum = null;
     swAyarYaz(false);
     webBildirimCiz();
-    for (const k of ['jt_anahtar', 'jt_ad', 'jt_kuyruk', 'jt_rol', 'jt_iptal_goruldu', 'jt_uyari_goruldu', 'jt_pos_soruldu', 'jt_sihirbaz_tamam']) yerel.yaz(k, null);
+    // Tarayıcıdaki kayıt sadece bu merkezin ve bu oturumun kaydıysa silinir. Başka merkezin kaydı (ör. aynı tarayıcıda öbür
+    // uygulama bu arada giriş yaptı) olduğu gibi kalır; bu ekran sadece kendi oturumunu kapatır.
+    if (yerel.al('jt_anahtar') === anahtar && kayitBuMerkezin()) {
+      oturumKayitlariniSil();
+    }
     posSorulan.clear();
     posCalinan.clear();
     yerelSinyalAyarla(false);
@@ -1327,6 +1364,7 @@
     webBildirimTazele(); // web: abonelik tazelenir, kapalıysa uyarı
   } else {
     goster('ekGiris');
+    if (baskaMerkezKaydi) mesaj(false, 'Bu tarayıcıda başka bir JetTakip merkezinin kaydı var. Burada kodla giriş yaparsanız o kayıt bu tarayıcıdan kalkar.', 'girisMsg');
   }
   temaDugmeleri();
   window.JTUygulama = { yenile, kuyruk, panelAdresi, bildirimdenAcildiMi, sekmeSec, webBildirimAc, webBildirimTazele, webDurumu: () => webDurum };

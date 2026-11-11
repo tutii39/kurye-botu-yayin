@@ -66,6 +66,15 @@
   const eylemKimligi = () => 'e-' + rastgele(12);
 
   /**
+   * Tarayıcı kaydının adı (11.11): TEST derlemesinde jt_x → jt_test_x, canlıda jt_x aynen. TEST (/kurye-test/) ve canlı (/kurye/)
+   * aynı alan adında; ayrı adlarla birbirinin kaydını görmezler.
+   */
+  function kayitAdi(k, ortam) {
+    k = String(k);
+    return ortam === 'TEST' && k.startsWith('jt_') && !k.startsWith('jt_test_') ? 'jt_test_' + k.slice(3) : k;
+  }
+
+  /**
    * İnternetsiz kuyruk. depo: { oku(): dizi, yaz(dizi) } (tarayıcıda localStorage). Kuyruktaki işlem:
    * { eylem, fn, args, siparis, tur, eklendi }. isle(): sırayla gönderir; internet yoksa durur (sıra korunur),
    * sunucu cevap verdiyse (sonuç ne olursa olsun) işlem kuyruktan çıkar ve sonucu bildirilir.
@@ -623,7 +632,7 @@
 
   return {
     iosSurumu, webBildirimDurumu, hashSiparis, teklifSesiCalsin, TEKLIF_SES_MS,
-    api, kuyruk, rastgele, eylemKimligi, dugmeler, uyarilar, almaYazisi, odemeAdi, para, kodDuzelt, CevrimdisiHata, SunucuHata,
+    api, kuyruk, rastgele, eylemKimligi, kayitAdi, dugmeler, uyarilar, almaYazisi, odemeAdi, para, kodDuzelt, CevrimdisiHata, SunucuHata,
     durumAdi, tahminiDurum, nedenDogrula, iptalUyarisi, adimYazisi, DURUM_ADI, ekranUyarilari, ekranUyarisi, gordumCagrisi,
     gosterilen, fcmAnahtari, sorguAraligi, siparisNo, bildirimYoluYazisi, varisAyari, varisDurumu, paraKutusu, GOREV_ADIM, KAYNAK_ADI, alamazNedeni, GOSTERILEN_SURE_MS, GOSTERILEN_EN_FAZLA, SORGU_ARALIK_MS,
     kartliMi, posEsigi, poslar, posSeridi, posSorusu, teklifPosUyarisi, posIadeArgs, POS_ESIK_VARSAYILAN,

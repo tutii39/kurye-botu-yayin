@@ -28,7 +28,9 @@
   // Android eklentisi yoksa (iPhone ana ekran / tarayıcı): kısa iPhone hazırlığı. iOS 16.4+, ana ekranda mı, bildirim izni
   // (düğme; durum uygulama.js'den), "Vardiyada zil açık, Odak kapalı" hatırlatması, Düşük Güç Modu notu.
   // Android hazırlığı / sihirbaz / ses seçimi web'de gösterilmez.
-  const yerelOku = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  // Kayıt adı: TEST'te jt_test_..., canlıda jt_... (cekirdek.js kayitAdi)
+  const kayitAdi = (k) => (window.JTC && window.JTC.kayitAdi ? window.JTC.kayitAdi(k, (window.JT_AYAR || {}).ortam) : k);
+  const yerelOku = (k) => { try { return localStorage.getItem(kayitAdi(k)); } catch (e) { return null; } };
   const androidParcalari = () => document.querySelectorAll('[data-android]');
   function webHazirlik() {
     androidParcalari().forEach((e) => e.classList.add('hidden'));
@@ -51,7 +53,7 @@
     k.push(item(null, 'Düşük Güç Modu kapalı (öneri)', 'Düşük Güç Modu açıkken bildirimler gecikebilir. Ayarlar → Pil.'));
     k.push('<p class="kucuk">Uygulama kapalıyken telefon bildirimle çalar. Uygulama açıkken yeni sipariş ve uyarılarda uygulama kendi sesini çalar (ilk dokunuştan sonra).</p>');
     $('liste').innerHTML = k.join('');
-    $('liste').querySelectorAll('[data-onay="zil"]').forEach((c) => (c.onchange = () => { try { if (c.checked) localStorage.setItem('jt_zil_tamam', '1'); else localStorage.removeItem('jt_zil_tamam'); } catch (e) { /* yok */ } webHazirlik(); }));
+    $('liste').querySelectorAll('[data-onay="zil"]').forEach((c) => (c.onchange = () => { try { if (c.checked) localStorage.setItem(kayitAdi('jt_zil_tamam'), '1'); else localStorage.removeItem(kayitAdi('jt_zil_tamam')); } catch (e) { /* yok */ } webHazirlik(); }));
   }
   // Uygulama bildirim durumunu her tazelediğinde (Telefon sekmesi açıksa liste güncellenir)
   function webCiz() { if (!eklenti() && !$('liste').closest('.hidden')) webHazirlik(); }
@@ -141,7 +143,7 @@
   // ------------------------------------------------------------------ kurulum sihirbazı (04.11)
   // İlk girişte açılır (uygulama.js): telefona gereken adımlar tek tek. "Ayarı aç" ilgili ekranı açar; dönünce ölçülebilen
   // adımlar kendiliğinden yeşil olur, ölçülemeyenlerde kurye "Yaptım" der. Sonuna gelince bir daha kendiliğinden açılmaz.
-  const yerelYaz = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* yok */ } };
+  const yerelYaz = (k, v) => { try { localStorage.setItem(kayitAdi(k), v); } catch (e) { /* yok */ } };
   let sihirbazSira = -1; // -1: kapalı
   function sihirbazKapat() {
     sihirbazSira = -1;
