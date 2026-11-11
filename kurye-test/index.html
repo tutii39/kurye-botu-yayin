@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="tr" data-tema="koyu">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1220" />
+<!-- Web uygulaması (iPhone: Safari → Paylaş → Ana Ekrana Ekle); Android APK'da etkisiz -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="ikon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Kurye TEST" />
+<title>JetTakip Kurye TEST</title>
+<script>try { var t = localStorage.getItem('jt_tema'); if (t === 'acik' || t === 'koyu') document.documentElement.dataset.tema = t; } catch (e) { /* yok */ }</script>
+<link rel="stylesheet" href="tasarim.css" />
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <!-- Başlık: giriş, yönetici ve Hazırlık ekranında (kurye ana ekranında üst şerit var) -->
+  <header class="ust" id="ust">
+    <svg class="logo" viewBox="0 0 1024 1024" aria-hidden="true">
+      <rect width="1024" height="1024" rx="224" fill="#1d5fd1"/>
+      <g transform="translate(526 512) skewX(-12) translate(-512 -512)" fill="#fff">
+        <rect x="96" y="300" width="150" height="46" rx="23"/><rect x="150" y="380" width="96" height="46" rx="23"/>
+        <rect x="290" y="268" width="560" height="132" rx="20"/><rect x="618" y="300" width="132" height="480" rx="20"/>
+        <path d="M 338 300 H 470 V 610 A 175 175 0 0 1 120 610 V 590 H 252 V 610 A 43 43 0 0 0 338 610 Z"/>
+      </g>
+    </svg>
+    <div class="baslik"><b>JetTakip Kurye</b><span id="kuryeAd"></span></div>
+    <button id="btnHazirlik" class="ustDugme hidden" aria-label="Hazırlık">⚙</button>
+  </header>
+
+  <!-- Giriş: yöneticinin verdiği kod -->
+  <main id="ekGiris" class="ekran hidden">
+    <h1>Giriş</h1>
+    <p>Yöneticinizin verdiği <b>8 haneli kodu</b> yazın (ör. K7PQ-4XMR).</p>
+    <input id="kod" class="kodKutu" autocomplete="off" autocapitalize="characters" inputmode="text" maxlength="12" placeholder="XXXX-XXXX" aria-label="Giriş kodu" />
+    <button id="btnGiris" class="buyuk birincil">GİRİŞ</button>
+    <p id="girisMsg" class="mesaj hidden" role="status"></p>
+  </main>
+
+  <!-- Kurye ana ekranı (arayüz v2): üst özet şeridi, durum şeritleri, sekme içeriği, alt sekmeler -->
+  <div id="ekAna" class="cerceve hidden">
+    <div class="serit">
+      <button id="btnMesai" class="vardiya" role="switch" aria-checked="false" aria-label="Vardiya"><span class="anahtar"></span><span><b id="mesaiYazi">Kapalı</b><small id="mesaiAlt">vardiya</small></span></button>
+      <div class="ozetS"><b class="sayi" id="ozTeslim">-</b><small>bugün teslim</small></div>
+      <div class="ozetS nakit"><b class="sayi" id="ozNakit">-</b><small id="ozNakitEtiket">işletmelere borcum</small></div>
+    </div>
+    <div id="uyarilar" class="durumlar" aria-live="polite"></div>
+    <!-- Web uygulaması (iPhone): bildirim kapalıysa uyarı + "Bildirimleri aç" (izin sadece düğmeyle istenir) -->
+    <div id="webBildirim" class="durumlar hidden"></div>
+    <p id="anaMsg" class="mesaj hidden" role="status"></p>
+    <section id="sGorev" class="panel" role="tabpanel" aria-label="Görevler">
+      <div id="gorevUst"></div>
+      <div id="benim"></div>
+    </section>
+    <section id="sBugun" class="panel hidden" role="tabpanel" aria-label="Bugün"></section>
+    <section id="sTelefon" class="panel hidden" role="tabpanel" aria-label="Telefon">
+      <div id="telefonUst"></div>
+    </section>
+    <nav class="sekmeler" role="tablist">
+      <button role="tab" data-sekme="gorev" aria-selected="true"><span class="rozet hidden" id="rozetGorev"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg>Görevler</button>
+      <button role="tab" data-sekme="bugun" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Bugün</button>
+      <button role="tab" data-sekme="telefon" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>Telefon</button>
+    </nav>
+    <input id="fotoGirdi" type="file" accept="image/*" capture="environment" class="hidden" />
+  </div>
+
+  <!-- Yönetici: "kimse almadı" uyarıları (panel yöneticisi; sipariş almaz) -->
+  <main id="ekYonetici" class="ekran hidden">
+    <h1>Yönetici</h1>
+    <p class="kucuk">Kimse almayan siparişlerde bu telefon alarm sesiyle uyarır. Bildirime dokununca panelde o sipariş açılır.</p>
+    <section class="ozet">
+      <div><span class="k">Bekleyen sipariş</span><b id="yoBekleyen">-</b></div>
+      <div><span class="k">Mesaide kurye</span><b id="yoMesaide">-</b></div>
+    </section>
+    <p id="yoMsg" class="mesaj hidden"></p>
+    <h2>Kimse almadı</h2>
+    <div id="yoAlarm"><p class="bos">Şu an bekleyen uyarı yok.</p></div>
+    <button id="btnPanel" class="buyuk ikincil">Paneli aç</button>
+  </main>
+
+  <!-- Hazırlık (yönetici telefonunda ayrı ekran; kurye telefonunda içerik "Telefon" sekmesine taşınır) -->
+  <main id="ekHazirlik" class="ekran hidden">
+    <button id="btnGeri" class="buyuk ikincil">← Geri dön</button>
+    <div id="hazirlikIcerik">
+      <h1>Telefon hazırlığı</h1>
+      <p class="kucuk" id="cihaz"></p>
+      <button id="btnSihirbaz" class="buyuk" data-android>Eksikleri adım adım yap</button>
+      <div id="sihirbaz" class="hidden"></div>
+      <div id="liste"></div>
+      <h2 data-android>Sipariş sesi</h2>
+      <div id="sesListe" data-android></div>
+      <button id="btnTelefonSes" class="buyuk ikincil" data-android>Telefondaki seslerden seç</button>
+      <button id="btnSesDene" class="buyuk ikincil" data-android>Sesi dene (kilitleyip)</button>
+      <p id="sesMsg" class="mesaj hidden"></p>
+      <h2>Tema</h2>
+      <p class="kucuk">Koyu: gece ve pil için · Açık: güneş altında</p>
+      <div class="tema-secim"><button type="button" data-tema="koyu" aria-pressed="true">Koyu</button><button type="button" data-tema="acik" aria-pressed="false">Açık</button></div>
+      <h2>Çıkış</h2>
+      <button id="btnCikis" class="buyuk tehlike">Bu telefondan çıkış yap</button>
+    </div>
+  </main>
+
+  <!-- Yeni sipariş teklifi (tam ekran): tek dokunuş = al + dükkâna varış süresi -->
+  <div id="teklifEkran" class="katman teklif hidden" role="dialog" aria-modal="true" aria-label="Yeni sipariş teklifi">
+    <div id="yeni"></div>
+  </div>
+
+  <!-- "Teslim edemedim": neden seçimi (liste merkezden gelir; "Diğer"de açıklama zorunlu) -->
+  <div id="nedenKutu" class="perde hidden" role="dialog" aria-modal="true" aria-labelledby="nedenBaslik">
+    <div class="perdeKutu">
+      <h2 id="nedenBaslik">Teslim edemedim</h2>
+      <p>Neden teslim edemediniz?</p>
+      <div id="nedenListe"></div>
+      <textarea id="nedenAciklama" maxlength="300" rows="3" placeholder="Kısa açıklama" aria-label="Kısa açıklama"></textarea>
+      <p id="nedenMsg" class="mesaj hidden"></p>
+      <button id="btnNedenGonder" class="buyuk tehlike">GÖNDER</button>
+      <button id="btnNedenVazgec" class="buyuk ikincil">Vazgeç</button>
+    </div>
+  </div>
+
+  <!-- Elle atamada varış süresi (SANA ATANDI onaylanınca) -->
+  <div id="varisKutu" class="perde hidden" role="dialog" aria-modal="true" aria-labelledby="varisBaslik">
+    <div class="perdeKutu">
+      <div class="etiket" id="varisEtiket" style="color:var(--marka)">Sana atandı</div>
+      <h2 id="varisBaslik">Dükkâna kaç dakikada varırsın?</h2>
+      <p id="varisBilgi"></p>
+      <div id="varisSecim" class="sure-secim"></div>
+      <button id="btnVarisDukkanda" class="btn ikincil" type="button">Zaten dükkândayım</button>
+      <button id="btnVarisSonra" class="bag" type="button">Sonra seçerim</button>
+    </div>
+  </div>
+
+  <!-- POS cihazı (06.11): "POS'u aldın mı?" / "POS zaten sende" / teslimden sonra "POS'u geri götür" -->
+  <div id="posKutu" class="perde hidden" role="dialog" aria-modal="true" aria-labelledby="posBaslik">
+    <div class="perdeKutu">
+      <div class="etiket" id="posEtiket" style="color:var(--turuncu-metin)">Kartlı sipariş</div>
+      <h2 id="posBaslik">İşletmenin POS cihazını aldın mı?</h2>
+      <p id="posBilgi"></p>
+      <button id="btnPosEvet" class="btn ana" type="button">Evet, POS bende</button>
+      <button id="btnPosIkinci" class="btn ikincil hidden" type="button">İkinci bir POS aldım</button>
+      <button id="btnPosHayir" class="bag" type="button">Hayır, almadım</button>
+    </div>
+  </div>
+
+  <!-- Nakit borcu (08.11): kapıda nakitte "Paketi aldım"dan sonra "Bu siparişin parasını işletmeye şimdi verdin mi?" -->
+  <div id="nakitKutu" class="perde hidden" role="dialog" aria-modal="true" aria-labelledby="nakitBaslik">
+    <div class="perdeKutu">
+      <div class="etiket" id="nakitEtiket" style="color:var(--turuncu-metin)">Kapıda nakit</div>
+      <h2 id="nakitBaslik">Bu siparişin parasını işletmeye şimdi verdin mi?</h2>
+      <p id="nakitBilgi"></p>
+      <button id="btnNakitEvet" class="btn ana" type="button">Evet, verdim</button>
+      <button id="btnNakitHayir" class="btn ikincil" type="button">Hayır, sonra vereceğim</button>
+    </div>
+  </div>
+
+  <!-- Vardiyayı bitir: özet + 1 sn basılı tut; elinde paket varken düğme yok (06.11) -->
+  <div id="bitirKutu" class="perde hidden" role="dialog" aria-modal="true" aria-labelledby="bitirBaslik">
+    <div class="perdeKutu">
+      <h2 id="bitirBaslik">Vardiyayı bitir</h2>
+      <div class="buyuk-rakamlar"><div><b class="sayi" id="bitirTeslim">0</b><small>bugün teslim</small></div><div><b class="sayi nakit-yazi" id="bitirNakit">0 TL</b><small id="bitirNakitEtiket">işletmelere borcum</small></div></div>
+      <div id="bitirEngel"></div>
+      <div id="bitirPos"></div>
+      <div id="bitirNakitUyari"></div>
+      <p id="bitirNot">Vardiya kapanınca yeni sipariş gelmez.</p>
+      <button id="btnBitir" class="tut kirmizi" type="button" aria-label="Vardiyayı bitir: 1 saniye basılı tutun"><span class="dolgu"></span><span class="yazi-t">VARDİYAYI BİTİR<small>1 saniye basılı tut</small></span></button>
+      <button id="btnBitirVazgec" class="bag" type="button">Vazgeç</button>
+    </div>
+  </div>
+
+  <!-- Tam ekran, sesli uyarı (v2): iptal / geri alındı / devredildi / sana atandı. 1 sn basılı tutarak kapanır -->
+  <div id="iptalEkran" class="katman uyariEkran t-iptal hidden" role="alertdialog" aria-modal="true" aria-labelledby="iptalBaslik">
+    <div class="ust-alan">
+      <div class="ikon" id="iptalIkon" aria-hidden="true">✕</div>
+      <h1 id="iptalBaslik">İPTAL</h1>
+      <div id="iptalBilgi" class="siparis-kart"></div>
+      <div id="iptalMetin" class="cumle">Bu siparişe gitmeyin</div>
+    </div>
+    <div class="alt-alan">
+      <button id="btnIptalGordum" class="tut" type="button" aria-label="Gördüm: 1 saniye basılı tutun"><span class="dolgu"></span><span class="yazi-t"><span id="iptalOnay">GÖRDÜM</span><small>1 saniye basılı tut</small></span></button>
+    </div>
+  </div>
+
+  <script src="js/ayar.js"></script>
+  <script src="js/cekirdek.js"></script>
+  <script src="js/sihirbaz.js"></script>
+  <script src="js/hazirlik.js"></script>
+  <script src="js/ses.js"></script>
+  <script src="js/uygulama.js"></script>
+</body>
+</html>
