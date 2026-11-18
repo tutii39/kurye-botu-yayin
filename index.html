@@ -1693,7 +1693,8 @@ const KY = (() => {
   /** Telefon sağlığı: { metin: "son sinyal 2 dk önce · pil %80", sessiz } — sessiz: vardiyada ve eşikten uzun sinyal yok */
   function sinyalDurumu(k, veri, simdi) {
     const n = simdi || new Date(), d = dkTam(k.son_sinyal, n);
-    const sessiz = Boolean(k.aktif && k.mesaide && (k.sessiz_uyari || (d != null && d >= esikler(veri).sessiz_esik_dk)));
+    // 09.11: iPhone (web) arka planda sinyal gönderemez; süreye bakılmaz (merkez uyarısı varsa yine gösterilir)
+    const sessiz = Boolean(k.aktif && k.mesaide && (k.sessiz_uyari || (k.bildirim_yolu !== 'web' && d != null && d >= esikler(veri).sessiz_esik_dk)));
     const pil = k.pil != null ? ` · pil %${k.pil}${k.sarjda ? ' (şarjda)' : ''}` : '';
     return { sessiz, dk: d, metin: k.son_sinyal ? `son sinyal ${onceYaz(d)}${pil}` : 'sinyal yok' };
   }
@@ -1875,18 +1876,29 @@ const KY = (() => {
   /** Siparişin gösterilen no'su (05.11): dükkânın gördüğü kısa no; yoksa defterdeki kaynak no */
   const no = (o) => '#' + ((o && (o.kisa_no || o.kaynak_no)) || '');
   const bildirimYolu = (k) => (k && k.bildirim_yolu === 'fcm+sorgu' ? { metin: 'bildirim: FCM + sorgu', uyari: false }
-    : k && k.bildirim_yolu === 'sorgu' ? { metin: 'bildirim: sadece sorgu (Google yok)', uyari: true } : null);
+    : k && k.bildirim_yolu === 'sorgu' ? { metin: 'bildirim: sadece sorgu (Google yok)', uyari: true }
+    : k && k.bildirim_yolu === 'web' ? { metin: 'bildirim: iPhone (web)', uyari: false } : null); // 09.11: web uygulaması
   /**
    * Son deneme bildiriminin sonucu (04.11). d: kuryenin son_deneme'si; mesaide: kurye vardiyada mı; simdi: merkezin saati
    * (veri.zaman; tarayıcı saatine güvenilmez). Döner { sinif: yesil | turuncu | kirmizi | gri, metin, bekliyor } ya da null.
    * 30 sn içinde hiçbir yoldan gelmezse kırmızı "bildirim gelmiyor".
    */
   const DENEME_BEKLE_SN = 30;
-  function denemeSonucu(d, mesaide, simdi) {
+  // web: kurye iPhone web uygulamasında (bildirim yolu 'web', 09.11): tek yol web bildirimi (merkeze 'fcm' olarak yazılır),
+  // sorgu yok; web bildirimi geldiyse yeşil.
+  function denemeSonucu(d, mesaide, simdi, web = false) {
     if (!d || !d.olusturma) return null;
     const gecen = (new Date(simdi || Date.now()) - new Date(d.olusturma)) / 1000;
     const bekle = gecen < DENEME_BEKLE_SN;
     const sn = (x) => `${Number(x).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} sn`;
+    if (web) {
+      const onde = d.fcm_onde === true ? ' · uygulama açıktı' : d.fcm_onde === false ? ' · uygulama kapalı / arkadaydı' : '';
+      if (d.fcm_sn != null) return { sinif: 'yesil', bekliyor: false, metin: `✓ web bildirimi ${sn(d.fcm_sn)}${onde}` };
+      if (d.kuyruk === 'alici_yok') return { sinif: 'kirmizi', bekliyor: false, metin: '✗ web bildirimi gitmedi (iPhone\'da bildirim izni / abonelik yok) — kurye Telefon sekmesinden "Bildirimleri aç"sın' };
+      if (d.kuyruk === 'hata') return { sinif: 'kirmizi', bekliyor: false, metin: '✗ web bildirimi gönderilemedi (merkez hatası)' };
+      if (bekle) return { sinif: 'gri', bekliyor: true, metin: '… web bildirimi bekleniyor' };
+      return { sinif: 'kirmizi', bekliyor: false, metin: '✗ web bildirimi gelmedi — iPhone\'da zil / Odak / bildirim iznini kontrol edin' };
+    }
     const fcm = d.fcm_sn != null ? { ok: true, metin: `✓ FCM ${sn(d.fcm_sn)}` }
       : d.kuyruk === 'alici_yok' ? { ok: false, metin: '✗ FCM gitmedi (telefonda Google / jeton yok)' }
       : d.kuyruk === 'hata' ? { ok: false, metin: '✗ FCM gönderilemedi (merkez hatası)' }
@@ -2224,7 +2236,7 @@ const KY = (() => {
         <td class="${d.dolu ? 'ky-kirmizi-yazi' : ''}">${k.aktif_paket} / ${d.sinir}${k.paket_siniri ? '' : '<span class="ky-alt-satir">varsayılan</span>'}</td>
         ${(() => { const nk = K.nakitKurye(veri, k.id); return `<td class="num ${d.nakitAsti ? 'ky-kirmizi-yazi' : ''}">${veri.nakit ? K.tl(nk.borc) : '-'}${nk.esikAsildi ? '<span class="ky-alt-satir">sınırı aştı</span>' : ''}${nk.sureAsildi ? '<span class="ky-alt-satir">süre geçti</span>' : ''}${nk.itiraz > 0 ? `<span class="ky-alt-satir ky-turuncu-yazi">${K.tl(nk.itiraz)} anlaşmazlık</span>` : ''}</td>`; })()}
         <td>${dkn}</td>
-        <td>${k.cihaz ? `${k.cihaz} telefon${k.son_gorulme ? `<span class="ky-alt-satir">son: ${K.tarihSaat(k.son_gorulme)}</span>` : ''}${(() => { const y = K.bildirimYolu(k); return y ? `<span class="ky-alt-satir ky-bildirim-yolu${y.uyari ? ' ky-turuncu-yazi' : ''}">${e(y.metin)}</span>` : ''; })()}${(() => { const dn = K.denemeSonucu(k.son_deneme, k.mesaide, veri.zaman); return dn ? `<span class="ky-alt-satir ky-deneme ky-deneme-${dn.sinif}${dn.sinif === 'kirmizi' ? ' ky-kirmizi-yazi' : dn.sinif === 'turuncu' ? ' ky-turuncu-yazi' : ''}">Deneme ${K.saat(k.son_deneme.olusturma)}: ${e(dn.metin)}</span>` : ''; })()}` : '<span class="ky-alt-satir">girilmedi</span>'}</td>
+        <td>${k.cihaz ? `${k.cihaz} telefon${k.son_gorulme ? `<span class="ky-alt-satir">son: ${K.tarihSaat(k.son_gorulme)}</span>` : ''}${(() => { const y = K.bildirimYolu(k); return y ? `<span class="ky-alt-satir ky-bildirim-yolu${y.uyari ? ' ky-turuncu-yazi' : ''}">${e(y.metin)}</span>` : ''; })()}${(() => { const dn = K.denemeSonucu(k.son_deneme, k.mesaide, veri.zaman, k.bildirim_yolu === 'web'); return dn ? `<span class="ky-alt-satir ky-deneme ky-deneme-${dn.sinif}${dn.sinif === 'kirmizi' ? ' ky-kirmizi-yazi' : dn.sinif === 'turuncu' ? ' ky-turuncu-yazi' : ''}">Deneme ${K.saat(k.son_deneme.olusturma)}: ${e(dn.metin)}</span>` : ''; })()}` : '<span class="ky-alt-satir">girilmedi</span>'}</td>
         <td><div class="actions">
           <button type="button" data-ky-islem="duzenle">Düzenle</button>
           ${k.aktif ? '<button type="button" data-ky-islem="kod">Giriş kodu</button>' : ''}

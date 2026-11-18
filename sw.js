@@ -20,12 +20,16 @@ self.addEventListener('push', (e) => {
   }));
 });
 
+// Kurye web uygulaması aynı adreste alt yolda (09.11: kurye/ canlı, kurye-test/ TEST): onun penceresi panel sayılmaz
+const KURYE_YOLU = /^kurye(-test)?\//;
+const panelPenceresi = (url) => url.startsWith(self.registration.scope) && !KURYE_YOLU.test(url.slice(self.registration.scope.length));
+
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const hedef = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
   e.waitUntil((async () => {
     const pencereler = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const acik = pencereler.find((c) => c.url.startsWith(self.registration.scope));
+    const acik = pencereler.find((c) => panelPenceresi(c.url));
     if (acik) {
       acik.postMessage({ tur: 'siparis_ac', url: hedef });
       if (acik.focus) await acik.focus();
