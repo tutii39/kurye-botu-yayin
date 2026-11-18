@@ -1,0 +1,165 @@
+/* JetTakip tasarım dili v2 — ortak değişkenler ve temel bileşenler (08.11 gece; ayrıntı docs/TASARIM-DILI.md)
+   Kaynak: YENİ JetTakip tasarımı (02.11 çizimi; Projeler\tasarim-referansi: OKU-BENI.txt + Main / Siparisler / Kuryeler /
+   Isletme / Masaustu .dc.html satır içi stilleri). 07.11'deki panel tabanlı dilin yerini alır.
+   Açık tema = çizimin paleti birebir. Koyu tema = aynı paletin koyusu; bütün metin / zemin çiftleri WCAG AA (≥ 4.5:1).
+   Değişken adları kurye uygulamasının adlarıyla aynı (--zemin, --yuzey, ...). Panel ve program SONRA giydirilecek. */
+
+/* Inter (OFL 1.1, yazi-tipi/OFL-LICENSE.txt): yerel dosyalar, çevrimdışı çalışır; sadece latin + latin-ext, 400/500/600/700.
+   Dosya yoksa system-ui'ye düşer. */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("yazi-tipi/inter-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("yazi-tipi/inter-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("yazi-tipi/inter-latin-ext-500-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("yazi-tipi/inter-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("yazi-tipi/inter-latin-ext-600-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("yazi-tipi/inter-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("yazi-tipi/inter-latin-ext-700-normal.woff2") format("woff2");
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("yazi-tipi/inter-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+:root, :root[data-tema="acik"] {
+  color-scheme: light;
+  /* yüzeyler */
+  --zemin: #f5f7fa;        /* sayfa zemini */
+  --yuzey: #ffffff;        /* kart, üst başlık, alt menü */
+  --yuzey2: #f1f3f7;       /* sekme kabı, nötr çip, avatar zemini */
+  --cizgi: #e5e8ee;        /* kart kenarı, başlık / menü çizgisi */
+  --cizgi-ince: #eef0f4;   /* liste satırı ayırıcı */
+  --cizgi-girdi: #d5dae3;  /* ikincil düğme ve giriş kutusu kenarı */
+  --ust-bant: #ffffff;     /* üst başlık beyaz (eski dilde koyu bant) */
+  --ust-bant-yazi: #111827;
+  /* yazı */
+  --yazi: #111827;
+  --ikinci: #5b6472;
+  --ucuncu: #374151;       /* çip ve ikon çizgisi (#374151) */
+  /* marka ve durumlar (ana renk / rozet zemini / rozet yazısı) */
+  --marka: #1d5fd1;        --marka-zemin: #eaf1fd;   --marka-yazi: #1548a6;   --marka-kenar: #c9daf8; --marka-koyu: #1548a6;
+  --yesil: #15803d;        --yesil-zemin: #e7f6ec;   --yesil-yazi: #14532d;
+  --turuncu: #9a5b00;      --turuncu-zemin: #fff4e0; --turuncu-yazi: #7a4a00;  --turuncu-kenar: #f3d7a6;
+  --turuncu-metin: #7a4a00;
+  --kirmizi: #b42318;      --kirmizi-zemin: #fdecea; --kirmizi-yazi: #8a1c12;  --kirmizi-kenar: #f5c2bc;
+  --gri: #5b6472;          --gri-zemin: #f1f3f7;     --gri-yazi: #374151;
+  /* beyaz yazılı dolu zemin (düğme, tutamak, rozet) */
+  --marka-dolgu: #1d5fd1; --yesil-dolgu: #15803d; --kirmizi-dolgu: #b42318;
+  /* biçim */
+  --yazi-ailesi: Inter, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --kose-kart: 12px; --kose-kucuk-kart: 12px; --kose-dugme: 10px; --kose-girdi: 10px; --kose-kucuk: 9px; --kose-hap: 999px;
+  --kenar: 1px; --kenar-kalin: 2px;
+  --dokunma: 44px;                             /* en küçük dokunma alanı */
+  --golge: none;                               /* çizimde gölge yok; kartlar kenarla ayrılır */
+  --golge-ust: 0 8px 24px rgba(17, 24, 39, .14);
+  --odak: 0 0 0 3px rgba(29, 95, 209, .3);
+}
+
+:root[data-tema="koyu"] {
+  color-scheme: dark;
+  --zemin: #0b1220; --yuzey: #121a2b; --yuzey2: #1a2336; --cizgi: #263045; --cizgi-ince: #1d2638; --cizgi-girdi: #334058;
+  --ust-bant: #121a2b; --ust-bant-yazi: #e7ecf3;
+  --yazi: #e7ecf3; --ikinci: #9aa4b2; --ucuncu: #c3cad5;
+  --marka: #6b9cf2;   --marka-zemin: #14264a; --marka-yazi: #a9c4f7; --marka-kenar: #2b4a85; --marka-koyu: #8fb2f5;
+  --yesil: #3dbe7a;   --yesil-zemin: #0f2a1c; --yesil-yazi: #7ee2a8;
+  --turuncu: #e0a33a; --turuncu-zemin: #2d2209; --turuncu-yazi: #f3c672; --turuncu-kenar: #5c4515; --turuncu-metin: #e8b04f;
+  --kirmizi: #f2726a; --kirmizi-zemin: #351513; --kirmizi-yazi: #fca7a0; --kirmizi-kenar: #6e2a24;
+  --gri: #9aa4b2;     --gri-zemin: #1d2638;   --gri-yazi: #c3cad5;
+  --marka-dolgu: #1d5fd1; --yesil-dolgu: #15803d; --kirmizi-dolgu: #b42318; /* beyaz yazı AA: açık temadaki dolgular */
+  --golge-ust: 0 8px 24px rgba(0, 0, 0, .5);
+  --odak: 0 0 0 3px rgba(107, 156, 242, .45);
+}
+/* data-tema yazılmamış sayfalarda cihazın tercihi */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema]) {
+    color-scheme: dark;
+    --zemin: #0b1220; --yuzey: #121a2b; --yuzey2: #1a2336; --cizgi: #263045; --cizgi-ince: #1d2638; --cizgi-girdi: #334058;
+    --ust-bant: #121a2b; --ust-bant-yazi: #e7ecf3;
+    --yazi: #e7ecf3; --ikinci: #9aa4b2; --ucuncu: #c3cad5;
+    --marka: #6b9cf2;   --marka-zemin: #14264a; --marka-yazi: #a9c4f7; --marka-kenar: #2b4a85; --marka-koyu: #8fb2f5;
+    --yesil: #3dbe7a;   --yesil-zemin: #0f2a1c; --yesil-yazi: #7ee2a8;
+    --turuncu: #e0a33a; --turuncu-zemin: #2d2209; --turuncu-yazi: #f3c672; --turuncu-kenar: #5c4515; --turuncu-metin: #e8b04f;
+    --kirmizi: #f2726a; --kirmizi-zemin: #351513; --kirmizi-yazi: #fca7a0; --kirmizi-kenar: #6e2a24;
+    --gri: #9aa4b2;     --gri-zemin: #1d2638;   --gri-yazi: #c3cad5;
+    --marka-dolgu: #1d5fd1; --yesil-dolgu: #15803d; --kirmizi-dolgu: #b42318;
+    --golge-ust: 0 8px 24px rgba(0, 0, 0, .5);
+    --odak: 0 0 0 3px rgba(107, 156, 242, .45);
+  }
+}
+
+/* ---------------------------------------------------------------- temel */
+.jt { background: var(--zemin); color: var(--yazi); font: 15px/1.4 var(--yazi-ailesi); }
+.jt-soluk { color: var(--ikinci); font-size: 13px; }
+.jt-sayi { font-variant-numeric: tabular-nums; }
+
+/* üst başlık (Main.dc.html header): beyaz, alt çizgi, solda 34 px mavi "JT" karesi (köşe 9), başlık 16/700 + alt satır 12 */
+.jt-baslik { background: var(--yuzey); border-bottom: var(--kenar) solid var(--cizgi); padding: 18px 20px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.jt-logo { width: 34px; height: 34px; border-radius: var(--kose-kucuk); background: var(--marka-dolgu); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+
+/* kart (Main.dc.html sayı kutuları): beyaz, 1 px #E5E8EE, köşe 12, iç boşluk 12/14, etiket 12 soluk + sayı 24/700 */
+.jt-kart { background: var(--yuzey); border: var(--kenar) solid var(--cizgi); border-radius: var(--kose-kart); padding: 12px 14px; }
+.jt-kutu { background: var(--yuzey); border: var(--kenar) solid var(--cizgi); border-radius: var(--kose-kart); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.jt-kutu span { color: var(--ikinci); font-size: 12px; } .jt-kutu b { font-size: 24px; font-weight: 700; }
+.jt-kutu.uyari { background: var(--turuncu-zemin); border-color: var(--turuncu-kenar); } .jt-kutu.uyari span, .jt-kutu.uyari b { color: var(--turuncu-yazi); }
+
+/* düğme (Kuryeler.dc.html): birincil mavi dolu; ikincil beyaz + #D5DAE3 kenar; köşe 9–10; en az 44 px */
+.jt-dugme { font: inherit; font-size: 14px; font-weight: 600; min-height: var(--dokunma); padding: 0 14px; border-radius: var(--kose-dugme);
+  border: var(--kenar) solid var(--cizgi-girdi); background: var(--yuzey); color: var(--yazi); cursor: pointer; }
+.jt-dugme.birincil { background: var(--marka-dolgu); border-color: var(--marka-dolgu); color: #fff; }
+.jt-dugme.birincil:hover { background: var(--marka-koyu); }
+.jt-dugme.onay { background: var(--yesil-dolgu); border-color: var(--yesil-dolgu); color: #fff; }
+.jt-dugme.tehlike { background: var(--kirmizi-dolgu); border-color: var(--kirmizi-dolgu); color: #fff; }
+.jt-dugme.kucuk { font-size: 13px; min-height: 36px; padding: 0 12px; }
+.jt-dugme:disabled { opacity: .5; }
+.jt-dugme:focus-visible { outline: none; box-shadow: var(--odak); }
+
+/* sekme (Siparisler.dc.html tablist): #F1F3F7 kap, 4 px iç boşluk, köşe 10; seçili beyaz zemin + koyu yazı */
+.jt-sekmeler { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; background: var(--yuzey2); padding: 4px; border-radius: var(--kose-dugme); }
+.jt-sekmeler button { min-height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--ikinci); font: inherit; font-size: 13px; font-weight: 600; }
+.jt-sekmeler button[aria-selected="true"] { background: var(--yuzey); color: var(--yazi); }
+/* alt menü (Main.dc.html nav): beyaz, üst çizgi; seçili mavi 600, diğerleri soluk 500 */
+.jt-menu { background: var(--yuzey); border-top: var(--kenar) solid var(--cizgi); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.jt-menu > * { min-height: var(--dokunma); display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--ikinci); font-weight: 500; }
+.jt-menu > [aria-selected="true"], .jt-menu > [aria-current] { color: var(--marka); font-weight: 600; }
+
+/* rozet (Main.dc.html işletme durumu): hap, 12 px; durum çiftleri */
+.jt-rozet { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: var(--kose-hap); white-space: nowrap;
+  background: var(--gri-zemin); color: var(--gri-yazi); }
+.jt-rozet.yesil { background: var(--yesil-zemin); color: var(--yesil-yazi); }
+.jt-rozet.turuncu { background: var(--turuncu-zemin); color: var(--turuncu-yazi); }
+.jt-rozet.kirmizi { background: var(--kirmizi-zemin); color: var(--kirmizi-yazi); }
+.jt-rozet.mavi { background: var(--marka-zemin); color: var(--marka-yazi); }
+.jt-nokta { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.jt-sayac { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: var(--kose-hap); background: var(--kirmizi-dolgu); color: #fff;
+  font-size: 12px; font-weight: 700; text-align: center; }
+
+/* uyarı kutusu (Main.dc.html "Uyarılar"): zemin + kenar + ikon rengi, başlık 14/600, açıklama 13 */
+.jt-serit { padding: 12px 14px; border-radius: var(--kose-kart); font-size: 14px; border: var(--kenar) solid var(--cizgi); background: var(--yuzey2); color: var(--gri-yazi); }
+.jt-serit.tamam { background: var(--yesil-zemin); color: var(--yesil-yazi); border-color: transparent; }
+.jt-serit.uyari { background: var(--turuncu-zemin); color: var(--turuncu-yazi); border-color: var(--turuncu-kenar); }
+.jt-serit.hata { background: var(--kirmizi-zemin); color: var(--kirmizi-yazi); border-color: var(--kirmizi-kenar); }
+.jt-serit.bilgi { background: var(--marka-zemin); color: var(--marka-yazi); border-color: var(--marka-kenar); }
+
+/* tablo (Masaustu.dc.html): başlık 12/600 soluk, satır 12/10, ayırıcı #EEF0F4 */
+.jt-tablo { width: 100%; border-collapse: collapse; font-size: 13px; }
+.jt-tablo th { text-align: left; padding: 8px 10px; color: var(--ikinci); font-size: 12px; font-weight: 600; border-bottom: var(--kenar) solid var(--cizgi); }
+.jt-tablo td { text-align: left; padding: 12px 10px; border-bottom: var(--kenar) solid var(--cizgi-ince); }
+.jt-tablo .sayi { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* giriş kutusu */
+.jt-girdi { font: inherit; width: 100%; min-height: var(--dokunma); padding: 0 12px; border: var(--kenar) solid var(--cizgi-girdi); border-radius: var(--kose-girdi);
+  background: var(--yuzey); color: var(--yazi); }
+.jt-girdi:focus { outline: none; border-color: var(--marka); box-shadow: var(--odak); }
+
+/* anahtar: kapalı gri, açık yeşil */
+.jt-anahtar { width: 46px; height: 26px; border-radius: 13px; background: var(--cizgi-girdi); position: relative; flex: none; transition: background .2s; }
+.jt-anahtar::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
+[aria-checked="true"] > .jt-anahtar, .jt-anahtar.acik { background: var(--yesil); }
+[aria-checked="true"] > .jt-anahtar::after, .jt-anahtar.acik::after { transform: translateX(20px); }
+
+/* kod / numara kutusu */
+.jt-kod { font: 700 30px/1.2 var(--mono); letter-spacing: .12em; text-align: center; padding: 12px; border: var(--kenar) dashed var(--cizgi-girdi);
+  border-radius: var(--kose-kart); background: var(--yuzey2); }
